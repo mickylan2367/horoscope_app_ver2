@@ -1,0 +1,275 @@
+{% extends 'chart/base.html' %}
+
+{% block content %}
+<div class="book-shell">
+  <div class="book">
+    <section class="page active">
+      <h2 class="reading-title">Akashic Index</h2>
+      <p class="reading-subtitle">Registered Profiles</p>
+      <hr>
+      <div class="index-book-page">
+        <div class="index-body">
+          {% for initial, items in grouped_profiles.items %}
+          {% if items %}
+          <section class="index-group">
+            <h3 class="index-letter">{{ initial }}</h3>
+            <div class="index-list">
+              {% for p in items %}
+              <form method="post" class="index-entry">
+                {% csrf_token %}
+                <input type="hidden" name="profile_id" value="{{ p.id }}">
+                <button type="submit" class="index-name-btn">
+                  <span class="index-name">{{ p.person_name }}</span>
+                  {% if p.birth_date %}
+                  <span class="index-meta">{{ p.birth_date }}</span>
+                  {% endif %}
+                </button>
+              </form>
+              {% endfor %}
+            </div>
+          </section>
+          {% endif %}
+          {% endfor %}
+        </div>
+      </div>
+    </section>
+
+    <section class="page hidden">
+      <h2 class="reading-title">✨ STAR TITLE ✨</h2>
+      <form method="post" novalidate>
+        {% csrf_token %}
+
+        <div class="form-row">
+          {{ form.person_name.label_tag }}
+          {{ form.person_name }}
+        </div>
+
+        <div class="form-row">
+          {{ form.place.label_tag }}
+          {{ form.place }}
+          <small id="placeStatus"></small>
+        </div>
+
+        <div class="form-row">
+          {{ form.birth_date.label_tag }}
+          {{ form.birth_date }}
+        </div>
+
+        <div class="form-row">
+          {{ form.birth_time.label_tag }}
+          {{ form.birth_time }}
+        </div>
+
+        {{ form.lat }}
+        {{ form.lon }}
+
+        <div class="form-actions">
+          <button type="submit" name="action" value="ai">Open</button>
+          <button type="submit" name="action" class="secondary" value="save">Save</button>
+        </div>
+      </form>
+    </section>
+
+    {% if ai_text_geo %}
+    <section class="page hidden">
+      <h2 class="reading-title">RECORD</h2>
+      <div class="reading-body">
+        {{ ai_text_geo }}
+      </div>
+    </section>
+    {% endif %}
+
+    {% if ai_text_helio %}
+    <section class="page hidden">
+      <h2 class="reading-title">GIFT</h2>
+      <div class="reading-body">
+        {{ ai_text_helio }}
+      </div>
+    </section>
+    {% endif %}
+
+    {% if chart_geo_url %}
+    <section class="page hidden">
+      <h2 class="reading-title">GEOCENTRIC</h2>
+      <p style="text-align: center;width: 60%;">
+        <img src="{{ chart_geo_url }}" alt="Horoscope chart">
+      </p>
+    </section>
+    {% endif %}
+
+    {% if result_geo %}
+    {% if result_geo.error %}
+    <p style="color:red;">{{ result_geo.error }}</p>
+    {% else %}
+    <section class="page hidden">
+      <h2 class="reading-title">GEOCENTRIC</h2>
+      <div class="reading-body">
+        <table class="result-table">
+          <tr>
+            <th>天体</th>
+            <th>Meaning</th>
+            <th>サイン</th>
+            <th>年齢</th>
+            <th>サビアンシンボル</th>
+          </tr>
+          {% for row in result_geo %}
+          <tr>
+            <td>{{ row.0 }}</td>
+            <td>{{ row.6 }}</td>
+            <td>{{ row.1 }} {{ row.2}}°</td>
+            <td>{{ row.5 }}</td>
+            <td>{{ row.4 }}</td>
+          </tr>
+          {% endfor %}
+        </table>
+      </div>
+    </section>
+    {% endif %}
+    {% endif %}
+
+    {% if result_helio %}
+    <section class="page hidden">
+      <h2 class="reading-title">HELIOCENTRIC</h2>
+      <div class="reading-body">
+        <table class="result-table">
+          <tr>
+            <th>天体</th>
+            <th>意味</th>
+            <th>星座</th>
+            <th>度数</th>
+            <th>サビアン</th>
+          </tr>
+          {% for row in result_helio %}
+          <tr>
+            <td>{{ row.0 }}</td>
+            <td>{{ row.4 }}</td>
+            <td>{{ row.1 }}</td>
+            <td>{{ row.2 }}°</td>
+            <td>{{ row.3 }}</td>
+          </tr>
+          {% endfor %}
+        </table>
+      </div>
+    </section>
+    {% endif %}
+
+    <div class="book-nav">
+      <button type="button" id="prevPage" aria-label="前のページ">←</button>
+      <button type="button" id="nextPage" aria-label="次のページ">→</button>
+    </div>
+  </div>
+</div>
+
+
+
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    // 位置検索
+    const placeInput = document.getElementById("id_place");
+    const latInput = document.getElementById("id_lat");
+    const lonInput = document.getElementById("id_lon");
+    const status = document.getElementById("placeStatus");
+
+    let lastQuery = "";
+
+    async function geocode(q) {
+      const url =
+        "https://nominatim.openstreetmap.org/search?format=json&limit=1&q=" +
+        encodeURIComponent(q);
+
+      const res = await fetch(url, {
+        headers: {
+          "Accept": "application/json",
+          "Accept-Language": "ja"
+        }
+      });
+
+      if (!res.ok) throw new Error("geocode failed");
+
+      const data = await res.json();
+      return data[0] || null;
+    }
+
+    if (placeInput && latInput && lonInput && status) {
+      placeInput.addEventListener("blur", async () => {
+        const q = (placeInput.value || "").trim();
+        status.textContent = "";
+        latInput.value = "";
+        lonInput.value = "";
+
+        if (!q || q === lastQuery) return;
+        lastQuery = q;
+
+        status.textContent = "（位置検索中…）";
+
+        try {
+          const hit = await geocode(q);
+
+          if (!hit) {
+            status.textContent = "（見つかりません。別の表記で）";
+            return;
+          }
+
+          latInput.value = hit.lat;
+          lonInput.value = hit.lon;
+          status.textContent =
+            `（OK: ${Number(hit.lat).toFixed(5)}, ${Number(hit.lon).toFixed(5)}）`;
+        } catch (e) {
+          status.textContent = "（検索失敗）";
+        }
+      });
+    }
+
+    // ページめくり
+    const pages = document.querySelectorAll(".book .page");
+    const prevBtn = document.getElementById("prevPage");
+    const nextBtn = document.getElementById("nextPage");
+
+    let currentPage = {% if ai_text_geo or ai_text_helio or chart_geo_url or result_geo or result_helio %}1{% else %}0{% endif %};
+
+  function showPage(index) {
+    pages.forEach((page, i) => {
+      page.classList.remove("active");
+      page.classList.add("hidden");
+
+      if (i === index) {
+        page.classList.remove("hidden");
+        page.classList.add("active");
+      }
+    });
+
+    if (prevBtn) {
+      prevBtn.style.visibility = (index === 0) ? "hidden" : "visible";
+    }
+
+    if (nextBtn) {
+      nextBtn.style.visibility = (index === pages.length - 1) ? "hidden" : "visible";
+    }
+  }
+
+  if (pages.length > 0) {
+    showPage(currentPage);
+
+    if (prevBtn) {
+      prevBtn.addEventListener("click", () => {
+        if (currentPage > 0) {
+          currentPage--;
+          showPage(currentPage);
+        }
+      });
+    }
+
+    if (nextBtn) {
+      nextBtn.addEventListener("click", () => {
+        if (currentPage < pages.length - 1) {
+          currentPage++;
+          showPage(currentPage);
+        }
+      });
+    }
+  }
+});
+</script>
+
+{% endblock %}

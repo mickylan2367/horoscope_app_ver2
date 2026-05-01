@@ -1,0 +1,181 @@
+{% extends 'diaryapp/base.html' %}
+
+{% block title %}Diary-List{% endblock %}
+{% block extra_head %}
+<style>
+  .card {
+    background: #fffafc;
+  }
+
+  .table th,
+  .table td {
+    border: none;
+    width: 2rem;
+    height: 2rem;
+    vertical-align: middle;
+  }
+
+  .table td.fw-bold {
+    background: #f8d7e1;
+    border-radius: 50%;
+  }
+
+  .calendar-table td {
+    position: relative;
+  }
+
+  .calendar-table td.today-sparkle {
+    color: #7c3aed;
+    font-weight: 700;
+    border-radius: 50%;
+    background:
+      radial-gradient(circle at 25% 20%, #fff 0 2px, transparent 3px),
+      radial-gradient(circle at 75% 30%, #ffe8fb 0 2px, transparent 3px),
+      radial-gradient(circle at 60% 80%, #fff7b8 0 2px, transparent 3px),
+      linear-gradient(135deg, #ffe4f0, #dbeafe);
+    box-shadow:
+      0 0 0 2px rgba(255, 255, 255, 0.85),
+      0 0 16px rgba(244, 114, 182, 0.75),
+      0 0 26px rgba(129, 140, 248, 0.45);
+    animation: calendarSparkle 1.6s ease-in-out infinite alternate;
+  }
+
+  .calendar-table td.today-sparkle::before,
+  .calendar-table td.today-sparkle::after {
+    content: "";
+    position: absolute;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 0 8px #fff, 0 0 14px #f9a8d4;
+    opacity: 0.9;
+  }
+
+  .calendar-table td.today-sparkle::before {
+    top: 2px;
+    right: 4px;
+    animation: calendarTwinkle 1.2s ease-in-out infinite;
+  }
+
+  .calendar-table td.today-sparkle::after {
+    left: 5px;
+    bottom: 3px;
+    animation: calendarTwinkle 1.2s ease-in-out 0.45s infinite;
+  }
+
+  @keyframes calendarSparkle {
+    from {
+      filter: brightness(0.98);
+      transform: scale(1);
+    }
+
+    to {
+      filter: brightness(1.18);
+      transform: scale(1.08);
+    }
+  }
+
+  @keyframes calendarTwinkle {
+    0%,
+    100% {
+      opacity: 0.25;
+      transform: scale(0.7);
+    }
+
+    50% {
+      opacity: 1;
+      transform: scale(1.2);
+    }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="row g-4">
+  <!-- 左：カレンダー -->
+  <aside class="col-lg-3">
+    <div class="card shadow-sm border-0 rounded-4">
+      <div class="card-body">
+        <h5 class="mb-3">Calendar</h5>
+        <div class="small text-muted mb-2" id="calendarMonth"></div>
+
+        <table class="table table-sm text-center align-middle mb-0 calendar-table">
+          <thead>
+            <tr>
+              <th>Su</th>
+              <th>Mo</th>
+              <th>Tu</th>
+              <th>We</th>
+              <th>Th</th>
+              <th>Fr</th>
+              <th>Sa</th>
+            </tr>
+          </thead>
+          <tbody id="calendarBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </aside>
+
+  <!-- 右：日記エリア -->
+  <section class="col-lg-9">
+    {% for diary in diaries %}
+    <div class="card mb-3">
+      <div class="card-body">
+        <h3 class="card-title">{{ diary.title }}</h3>
+        <h6 class="card-subtitle mb-2 text-muted">{{ diary.date }}</h6>
+        <div class="card-text">
+          {{ diary.rendered_content|safe }}
+        </div>
+
+        <a href="{% url 'diary_edit' diary.pk %}" class="btn btn-sm btn-outline-primary">EDIT HERE</a>
+      </div>
+    </div>
+    {% endfor %}
+    <!-- ここに diary 一覧 -->
+
+    <div class="alert alert-info text-center">
+      <a class="nav-link p-0" href="{% url 'diary_create' %}">+ADD</a>
+    </div>
+  </section>
+</div>
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    const monthLabel = document.getElementById("calendarMonth");
+    const calendarBody = document.getElementById("calendarBody");
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = today.getMonth();
+    const firstDay = new Date(year, month, 1).getDay();
+    const lastDate = new Date(year, month + 1, 0).getDate();
+
+    monthLabel.textContent = `${year} / ${String(month + 1).padStart(2, "0")}`;
+    calendarBody.innerHTML = "";
+
+    let date = 1;
+    for (let rowIndex = 0; rowIndex < 6 && date <= lastDate; rowIndex += 1) {
+      const row = document.createElement("tr");
+
+      for (let dayIndex = 0; dayIndex < 7; dayIndex += 1) {
+        const cell = document.createElement("td");
+
+        if (rowIndex > 0 || dayIndex >= firstDay) {
+          cell.textContent = date;
+
+          if (date === today.getDate()) {
+            cell.classList.add("today-sparkle");
+          }
+
+          date += 1;
+        }
+
+        row.appendChild(cell);
+      }
+
+      calendarBody.appendChild(row);
+    }
+  });
+</script>
+{% endblock %}

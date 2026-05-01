@@ -1,0 +1,60 @@
+{% extends 'diaryapp/base.html' %}
+
+{% block content %}
+<div class="card shadow-sm p-4 mb-4 bg-white rounded">
+  <h2 class="mb-4">{% if edit %}Edit Diary{% else %}Add Your Jounal{% endif %}</h2>
+
+  <form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+
+    {{ formset.management_form }}
+
+    <div class="mb-3">
+      {{ form.title.label_tag }}
+      {{ form.title }}
+    </div>
+
+    <div class="mb-3">
+      {{ form.date.label_tag }}
+      {{ form.date }}
+    </div>
+
+    <div class="mb-3">
+      {{ form.content.label_tag }}
+      {{ form.content }}
+    </div>
+
+    {% for image_form in formset %}
+    <div class="mb-3">
+      {{ image_form.as_p }}
+    </div>
+    {% endfor %}
+
+    <button type="submit" class="btn btn-outline-primary">
+      {% if edit %}UPDATE{% else %}SAVE{% endif %}
+    </button>
+  </form>
+</div>
+
+
+
+{% endblock %}
+
+
+{% block extra_js %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/simplemde/latest/simplemde.min.css">
+<script src="https://cdn.jsdelivr.net/simplemde/latest/simplemde.min.js"></script>
+
+<script>
+  window.addEventListener('DOMContentLoaded', () => {
+    new SimpleMDE({
+      element: document.getElementById("id_content"),
+      placeholder: "write your thoughts today.（Markdown）",
+      status: false,
+      spellChecker: false
+    });
+
+    document.getElementById("id_content")?.removeAttribute("required");
+  });
+</script>
+{% endblock %}

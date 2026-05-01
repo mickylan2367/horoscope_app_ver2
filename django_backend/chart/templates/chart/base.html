@@ -1,0 +1,28 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <title>My Horoscope App</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    <style>
+        
+    </style>
+</head>
+
+<body>
+
+    <div style="margin: 0;padding: 0;">
+        {% block content %}
+        {% endblock %}
+    </div>
+
+    <footer>
+        © 2025 Horoscope App
+    </footer>
+
+</body>
+
+</html>

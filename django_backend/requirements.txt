@@ -1,0 +1,9 @@
+Django==5.0.3
+matplotlib
+numpy
+openai
+pillow
+pytz
+requests
+skyfield
+markdown

@@ -1,0 +1,53 @@
+# API Keys
+django_backend/chart/api_keys.py
+
+# Python / Django
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+*.log
+
+# Django
+db.sqlite3
+db.sqlite3-journal
+media/
+staticfiles/
+chart/migrations/
+chart/__pycache__/
+chart/sabians.json
+chart/de421.bsp
+chart/de440.bsp
+django_backend/de421.bsp
+django_backend/de440s.bsp
+
+# Node.js
+node_modules/
+package-lock.json
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+*.local
+
+# slack-aiegent
+slack-ai-agent/agents/
+slack-ai-agent/__pycache__/
+slack-ai-agent/bin/__pycache__/
+
+# Agent Instructions
+AGENTS.md

@@ -1,0 +1,40 @@
+{% block content %}
+<h2>ヘリオセントリック（太陽中心）</h2>
+
+<form method="post" novalidate>
+  {% csrf_token %}
+
+  <p>
+    {{ form.birth_date.label_tag }}<br>
+    {{ form.birth_date }}
+  </p>
+
+  <p>
+    {{ form.birth_time.label_tag }}<br>
+    {{ form.birth_time }}
+    <br><small>※不明なら空欄（正午扱い）</small>
+  </p>
+
+  <button type="submit">計算</button>
+</form>
+
+{% if result %}
+  <h3>計算結果（Heliocentric Longitude）</h3>
+  <table border="1" cellpadding="6">
+    <tr>
+      <th>Planet</th>
+      <th>Sign</th>
+      <th>Degree</th>
+    </tr>
+
+    {% for name, v in result.items %}
+      <tr>
+        <td>{{ name }}</td>
+        <td>{{ v.sign }}</td>
+        <td>{{ v.deg_in_sign }}° {{ v.minute }}′</td>
+      </tr>
+    {% endfor %}
+  </table>
+{% endif %}
+
+{% endblock %}

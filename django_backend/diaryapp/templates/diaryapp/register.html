@@ -1,0 +1,51 @@
+{% extends "diaryapp/base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="container mt-4" style="max-width: 480px;">
+  <h2 class="mb-3">アカウント登録</h2>
+  <form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+
+    <!-- ユーザー情報 -->
+    {{ form.non_field_errors }}
+    <div class="mb-3">
+      <label class="form-label">ユーザー名</label>
+      {{ form.username }}
+      {{ form.username.errors }}
+    </div>
+
+    <!-- emailを入れるなら↓（RegisterFormで有効化している場合） -->
+    {# 
+    <div class="mb-3">
+      <label class="form-label">メールアドレス</label>
+      {{ form.email }}
+      {{ form.email.errors }}
+    </div>
+    #}
+
+    <!-- パスワード -->
+    <div class="mb-3">
+      <label class="form-label">パスワード</label>
+      {{ form.password1 }}
+      {{ form.password1.errors }}
+    </div>
+    <div class="mb-3">
+      <label class="form-label">パスワード（確認）</label>
+      {{ form.password2 }}
+      {{ form.password2.errors }}
+    </div>
+
+    <!-- プロフィール画像 -->
+    <div class="mb-3">
+      <label class="form-label">プロフィール画像（任意）</label>
+      {{ profile_form.icon }}
+      {{ profile_form.icon.errors }}
+      <div class="form-text">正方形推奨・2MB程度まで</div>
+    </div>
+
+    <button type="submit" class="btn btn-primary w-100">登録する</button>
+  </form>
+</div>
+{% endblock %}
+

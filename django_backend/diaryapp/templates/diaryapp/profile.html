@@ -1,0 +1,74 @@
+{% extends "diaryapp/base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="container mt-4" style="max-width: 520px;">
+
+  <h2 class="mb-3" style="text-align: center;">EDIT PROFILE</h2>
+
+  <!-- 現在のアイコン表示（任意） -->
+  {% if nav_profile and nav_profile.icon %}
+    <div class="mb-3 text-center">
+      <img src="{{ nav_profile.icon.url }}" class="rounded-circle" width="96" height="96" style="object-fit:cover;" alt="current icon">
+    </div>
+  {% endif %}
+
+  <!-- プロフィール情報（ユーザー名・メール・アイコン） -->
+  <div class="card mb-4">
+    <div class="card-body">
+      <h5 class="card-title" style="text-align: center;">User Information</h5>
+      <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="mb-3">
+          <label class="form-label">User Name</label>
+          <p>
+            {{ uform.username }} {{ uform.username.errors }}
+          </p>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">E-mail</label>
+          <p>
+            {{ uform.email }} {{ uform.email.errors }}
+          </p>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">User Icon</label>
+          <p>
+            {{ pform.icon }} {{ pform.icon.errors }}
+          </p>
+        </div>
+        <button type="submit" name="profile_submit" class="btn btn-primary w-100">
+          save info
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- パスワード変更 -->
+  <div class="card">
+    <div class="card-body">
+      <h5 class="card-title">Change Password</h5>
+      <form method="post">
+        {% csrf_token %}
+        <div class="mb-3">
+          <label class="form-label">Current Password</label>
+          {{ pwdform.old_password }} {{ pwdform.old_password.errors }}
+        </div>
+        <div class="mb-3">
+          <label class="form-label">New Password</label>
+          {{ pwdform.new_password1 }} {{ pwdform.new_password1.errors }}
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Confirm New Password</label>
+          {{ pwdform.new_password2 }} {{ pwdform.new_password2.errors }}
+        </div>
+        <button type="submit" name="password_submit" class="btn btn-outline-primary w-100">
+          Change Password
+        </button>
+      </form>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
