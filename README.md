@@ -19,6 +19,30 @@ LovelyWitch Life is a personal astrology app built with a Django backend and a R
 - Vite
 - Tailwind CSS
 
+## Required API Keys
+
+This repository uses the following API keys and tokens at runtime:
+
+- `OPENAI_API_KEY`
+  - Used by the Django horoscope app for AI-generated reading text.
+- `SLACK_BOT_TOKEN`
+  - Used by `slack-ai-agent` to connect the bot to Slack.
+- `SLACK_APP_TOKEN`
+  - Used by `slack-ai-agent` for Slack Socket Mode.
+
+Optional role-specific overrides are also supported by `slack-ai-agent`:
+
+- `SLACK_BOT_TOKEN_<ROLE>`
+- `SLACK_APP_TOKEN_<ROLE>`
+
+If you are only running the Django/React app and not the Slack agent, you only need `OPENAI_API_KEY` for the AI reading feature.
+
+## Where To Put Them
+
+- For the Django app, set `OPENAI_API_KEY` as an environment variable before starting the backend.
+- For `slack-ai-agent`, put `SLACK_BOT_TOKEN` and `SLACK_APP_TOKEN` in a role-specific `.env` file under `slack-ai-agent/agents/<role>/.env`, or set them as environment variables.
+- If both are present, the agent prefers the role-specific `.env` file first and then falls back to the process environment.
+
 ## Project Structure
 
 - `django_backend/` for the Django project, API endpoints, templates, and media files

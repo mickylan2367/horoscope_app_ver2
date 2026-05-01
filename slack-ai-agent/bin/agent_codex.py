@@ -10,9 +10,8 @@ from .profile_loader import AGENT_ROOT
 
 
 def build_role_bundle(role_config: RoleConfig) -> str:
-    md_root = AGENT_ROOT / "md"
     docs = [
-        ("rules", md_root / "rules.md"),
+        ("rules", AGENT_ROOT / "agents" / "rules.md"),
         ("role", AGENT_ROOT / role_config.instructions_file),
     ]
     docs.extend((Path(doc).stem, AGENT_ROOT / doc) for doc in role_config.extra_docs)

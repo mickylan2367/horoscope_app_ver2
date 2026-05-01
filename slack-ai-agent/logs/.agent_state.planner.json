@@ -1,47 +1,15 @@
 {
   "threads": {
-    "1777559406.199439": {
+    "1777604290.259939": {
       "role": "planner",
-      "last_fingerprint": "1a57dc2e4315f30b2dbcf09f1fce99539153c2e889228064e24827b5e60d6fc9",
-      "last_request": "hello",
-      "last_response": "こんにちは。現時点では作業依頼はありません。",
-      "updated_at": 1777559423.3545964
-    },
-    "1777559591.844509": {
-      "role": "planner",
-      "last_fingerprint": "931304dfdadd7f75174723703455e10936f1f83b7d298b2b283d3842e89f8de6",
-      "last_request": "What is your role?",
-      "last_response": "私はこのリポジトリの**Planner Agent**です。  \nNotion とローカルコードを確認して、`docs/agent_board.md` に安全な実装計画を反映する役割です。",
-      "updated_at": 1777559603.5370872
-    },
-    "1777559717.745699": {
-      "role": "planner",
-      "last_fingerprint": "44009346f7dce5afe2b9e6a9c462a97126e1550891d009a8de37c744434c12e4",
-      "last_request": "hello",
-      "last_response": "こんにちは。",
-      "updated_at": 1777559730.318602
-    },
-    "1777559818.777489": {
-      "role": "planner",
-      "last_fingerprint": "dadeb36a5e5a9439d53eb21708968896b1d64ad5dda1b95f0c7eb6ae480d26b0",
-      "last_request": "hi!",
-      "last_response": "追加で対応する作業はありません。具体的な変更内容か調査対象をください。",
-      "updated_at": 1777560147.1781867
-    },
-    "1777561063.695429": {
-      "role": "planner",
-      "last_fingerprint": "bd1c7061085c959bc93b8efff698c1d5ffebd7782d74a3e46d80fad8bd1616fb",
-      "last_request": "みんなに指示だしして",
-      "last_response": "### Planning Summary\n- Notion では、占星術アプリを「秘密の部屋」のような落ち着いた世界観で使う想定で、`landing -> login -> dashboard -> diary 작성 -> archive -> tarot/reading -> horoscope -> calendar -> profile` の流れが核です。\n- 現行コードは、React の主要画面、Django の auth/profile/diary/chart API、日記画像、`/app/` 配信まで進んでいます。\n- いちばん大きい差分は、体験を1本につなぐ統一ダッシュボード、legacy Django との導線整理、見た目の文言/コピーの不統一です。\n\n### Updated Files\n- [slack-ai-agent/md/agent_board.md](C:/Users/Owner/OneDrive/horoscope_project/slack-ai-agent/md/agent_board.md): 現状要約、Notion 要件、ギャップ、優先タスク、決定事項、未解決点、安全な実施順を更新しました。\n\n### Prioritized Tasks\n#### Priority 1\n- `P1-BE-001` API contract check\n- `P1-FE-001` Authenticated dashboard entry\n\n#### Priority 2\n- `P2-FE-001` Copy and polish pass\n- `INT-001` Route reconciliation\n\n### Risks\n- 旧 Django ルートが残る限り、ユーザー導線が分断されやすいです。\n- コピー整理の途中で、未整理の画面差分が追加で見つかる可能性があります。\n\n### Questions for Human\n- なし（ブロッキングなし）",
-      "updated_at": 1777561225.5417907
+      "last_fingerprint": "69dcdcbbc7cd01527bf1e8148b23178422a63608875b4401be40850e97d34939",
+      "last_request": "<@U0B14RT1533> hello!",
+      "last_response": "こんにちは。現時点で対応すべき変更はありません。",
+      "updated_at": 1777604305.6304886
     }
   },
   "processed_event_ids": {
-    "Ev0B19PHUMH7": 1777559411.5016592,
-    "Ev0B10FLL8Q4": 1777559593.8672209,
-    "Ev0B1R6YM7RN": 1777559720.459828,
-    "Ev0B0USSFSPQ": 1777559822.571208,
-    "Ev0B0THYHTQD": 1777560124.9489112,
-    "Ev0B0FLEE86T": 1777561066.6756968
-  }
+    "Ev0B0V8T7WE7": 1777604305.6461425
+  },
+  "inflight_event_ids": {}
 }
