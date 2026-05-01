@@ -2,6 +2,17 @@
 
 Slack bot runner for this repository's private role agents.
 
+<p style="width:80%;text-align:center">
+<img src="img/console.png">
+</p>
+
+- Once you activate the app, select the agnets you want to use.
+
+<p style="width:80%;text-align:center">
+<img src="img/console2.png">
+</p>
+
+
 ## What It Uses
 
 - `slack-ai-agent/app.py` starts the selected role or launches all roles.
