@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>{% block title %}My Lovely Diary{% endblock %}</title>
+    <title>{% block title %}Daily Witchcrafts{% endblock %}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- Bootstrap CSS CDN -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -14,19 +14,20 @@
     <style>
         body {
             font-family: 'Nunito', sans-serif;
-            background: #fbeff2;
+            background: linear-gradient(180deg, #f0e2ee 0%, #f7edf5 55%, #eedfe9 100%);
+            color: #4b3850;
             /* グレイッシュピンク */
         }
 
         .navbar {
-            background: linear-gradient(45deg, #f8e1e7, #f4c2c2);
+            background: linear-gradient(45deg, #c98ca8, #dca5b6);
             /* 落ち着いたピンクグラデ */
         }
 
         .navbar-brand {
             font-weight: 700;
             font-size: 1.5rem;
-            color: #5c3a3a !important;
+            color: #4b3850 !important;
             /* チョコレート系ブラウンで上品に */
         }
 
@@ -35,14 +36,14 @@
         }
 
         .btn-pink {
-            background-color: #f4c2c2;
-            color: #5c3a3a;
+            background-color: #e7b2c5;
+            color: #4b3850;
             border-radius: 50px;
             transition: 0.3s;
         }
 
         .btn-pink:hover {
-            background-color: #e8b0b0;
+            background-color: #d999b2;
             color: #fff;
         }
 
@@ -56,7 +57,7 @@
         }
 
         .nav-logout-btn:hover {
-            color: #e58c9e;
+            color: #9d5f7e;
             /* 落ち着いたピンクに変化 */
         }
 
@@ -89,7 +90,7 @@
 
     <nav class="navbar navbar-expand-lg shadow-sm mb-4">
         <div class="container">
-            <a class="navbar-brand" href="{% url 'home' %}">LovelyWitch Life</a>
+            <a class="navbar-brand" href="{% url 'home' %}">Daily Witchcrafts</a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>
             </button>

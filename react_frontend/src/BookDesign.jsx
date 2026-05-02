@@ -1,12 +1,50 @@
-import { useMemo, useState } from "react";
+﻿import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
+import { LucideHeading3, Sparkles } from "lucide-react";
+import { apiFetch } from "./api";
+
+const emptyForm = {
+  personName: "",
+  place: "",
+  birthDate: "",
+  birthTime: "",
+};
 
 const seededRandom = (seed) => {
   const x = Math.sin(seed) * 10000;
   return x - Math.floor(x);
 };
 
-export default function BookDesign() {
+const groupProfiles = (profiles) =>
+  profiles.reduce((groups, profile) => {
+    const first = (profile.personName || "#").charAt(0).toUpperCase();
+    const key = /[A-Z]/.test(first) ? first : "#";
+    return {
+      ...groups,
+      [key]: [...(groups[key] ?? []), profile],
+    };
+  }, {});
+
+const sortGroupedEntries = (groups) =>
+  Object.entries(groups).sort(([left], [right]) => {
+    if (left === "#") return 1;
+    if (right === "#") return -1;
+    return left.localeCompare(right);
+  });
+
+export default function BookDesign({ user }) {
+  const [profilesData, setProfilesData] = useState({
+    publicProfiles: [],
+    privateProfiles: [],
+  });
+  const [form, setForm] = useState(emptyForm);
+  const [result, setResult] = useState(null);
   const [currentPage, setCurrentPage] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const isAuthenticated = Boolean(user);
+
   const starStyles = useMemo(
     () =>
       Array.from({ length: 110 }, (_, i) => {
@@ -26,577 +64,294 @@ export default function BookDesign() {
     [],
   );
 
-  const groupedProfiles = {
-    A: [
-      { id: 1, person_name: "Alice", birth_date: "1998-04-12" },
-      { id: 2, person_name: "Aria", birth_date: "2001-08-22" },
-    ],
-    H: [
-      { id: 3, person_name: "Hikari", birth_date: "1999-11-03" },
-      { id: 4, person_name: "Hoshino", birth_date: "2000-02-14" },
-    ],
-    M: [
-      { id: 5, person_name: "Mina", birth_date: "1997-07-09" },
-    ],
-  };
+  useEffect(() => {
+    apiFetch("/api/chart/profiles/")
+      .then((data) => {
+        if (Array.isArray(data)) {
+          setProfilesData({ publicProfiles: data, privateProfiles: [] });
+          return;
+        }
+        setProfilesData({
+          publicProfiles: data.publicProfiles ?? [],
+          privateProfiles: isAuthenticated ? data.privateProfiles ?? [] : [],
+        });
+      })
+      .catch((err) => setError(err.message || "Failed to load profiles."));
 
-  const pages = useMemo(
-    () => [
-      {
-        key: "index",
-        title: "Akashic Index",
-        subtitle: "Registered Profiles",
-        type: "index",
-      },
-      {
-        key: "form",
-        title: "✨ STAR TITLE ✨",
-        type: "form",
-      },
-      {
-        key: "record",
-        title: "RECORD",
-        type: "text",
-        body: `あなたの星は、静かに深い場所で光っています。
-表には見えにくくても、内側には確かな意志と感受性があります。
+    if (!isAuthenticated) {
+      setForm(emptyForm);
+      setResult(null);
+      setCurrentPage(0);
+      setLoading(false);
+      setError("");
+    }
+  }, [isAuthenticated]);
 
-感情を派手に見せるよりも、物事をじっくり観察し、
-必要な瞬間にだけ力を使うような人です。
-
-その静かな集中力が、人生の大きな転機で
-重要な導きになります。`,
-      },
-      {
-        key: "gift",
-        title: "GIFT",
-        type: "text",
-        body: `あなたの本質的な才能は、
-世界の流れを敏感に読み取ること。
-
-曖昧な空気や、人の中にあるまだ言葉にならないものを
-直感的に感じ取る力があります。
-
-この力は、落ち着いた環境でこそ
-いちばん美しく発揮されます。`,
-      },
-      {
-        key: "geo-table",
-        title: "GEOCENTRIC",
-        type: "table",
-      },
-    ],
-    []
+  const publicGroupedEntries = useMemo(
+    () => sortGroupedEntries(groupProfiles(profilesData.publicProfiles)),
+    [profilesData.publicProfiles],
   );
 
-  const goPrev = () => setCurrentPage((p) => Math.max(0, p - 1));
-  const goNext = () => setCurrentPage((p) => Math.min(pages.length - 1, p + 1));
+  const privateGroupedEntries = useMemo(
+    () => sortGroupedEntries(groupProfiles(profilesData.privateProfiles)),
+    [profilesData.privateProfiles],
+  );
+
+  const update = (key) => (event) => {
+    setForm((current) => ({ ...current, [key]: event.target.value }));
+  };
+
+  const calculate = useCallback(
+    async ({ includeAi = false, saveProfile = false, profileId = null } = {}) => {
+      if (!isAuthenticated && !profileId) {
+        return;
+      }
+
+      setLoading(true);
+      setError("");
+      try {
+        const payload = profileId
+          ? { profileId, includeAi, saveProfile }
+          : { ...form, includeAi, saveProfile };
+        const data = await apiFetch("/api/chart/calculate/", {
+          method: "POST",
+          body: JSON.stringify(payload),
+        });
+        setResult(data);
+        setCurrentPage(isAuthenticated ? 4 : 2);
+        if (saveProfile) {
+          const nextProfiles = await apiFetch("/api/chart/profiles/");
+          setProfilesData({
+            publicProfiles: nextProfiles.publicProfiles ?? [],
+            privateProfiles: nextProfiles.privateProfiles ?? [],
+          });
+        }
+      } catch (err) {
+        setError(err.message || "Chart calculation failed.");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [form, isAuthenticated],
+  );
+
+  const pages = useMemo(() => {
+    const items = [
+      {
+        key: "intro",
+        title: "Welcome to your Star Book",
+        content: (
+          <div className="guest-card">
+            <div className="guest-eyebrow">
+              <Sparkles className="h-4 w-4" />
+              <span>あなたの星の物語を、ひとつずつ開いていく。</span>
+            </div>
+            <h2 className="guest-subtitle">Horoscope & Sabian Symbol Reading</h2>
+            <p className="guest-text">
+              <br />
+              最初のページでは、ここで何が見えるのかをやさしく案内します。
+              <br />
+              On the first page, we gently guide you through what you can discover here.
+              <br />
+              その先には、誰でものぞける無料の Akashic Index。
+              <br />
+              Beyond that, you can explore the free Akashic Index that anyone can browse.
+              <br />
+              <br />
+              <br />
+              有名人の星の並びや、運命の輪の気配を、ページをめくるように楽しめます。
+              <br />
+              You can enjoy celebrity charts and the subtle hints of fate as if turning the pages of a storybook.
+              <br />
+              ログインすると、あなた自身の記録が加わり、保存したホロスコープや新しい星の読み解きを続けて開けます。
+              <br />
+              When you sign in, your own records appear, along with saved horoscopes and new readings that continue your journey through the stars.
+            </p>
+            <div className="guest-actions">
+              <Link className="guest-button" to="/home">
+                Homeへ戻る
+              </Link>
+            </div>
+          </div>
+        ),
+      },
+      {
+        key: "public-index",
+        title: "AKASHIC INDEX",
+        subtitle: "Free shared database",
+        content: (
+          <ProfileIndex
+            entries={publicGroupedEntries}
+            emptyMessage="No shared profiles are available yet."
+            interactive
+            note="Shared index entries can be opened for details on the free plan."
+            onSelect={(profile) => calculate({ includeAi: true, profileId: profile.id })}
+          />
+        ),
+      },
+    ].filter(Boolean);
+
+    if (isAuthenticated) {
+      items.push(
+        {
+          key: "private-index",
+          title: "MY AKASHIC INDEX",
+          subtitle: "Your saved profiles",
+          content: (
+            <ProfileIndex
+              entries={privateGroupedEntries}
+              emptyMessage="No saved profiles yet."
+              interactive
+              onSelect={(profile) => calculate({ includeAi: true, profileId: profile.id })}
+            />
+          ),
+        },
+        {
+          key: "form",
+          title: "STAR TITLE",
+          content: (
+            <form
+              className="form-card"
+              onSubmit={(event) => {
+                event.preventDefault();
+                calculate({ includeAi: true });
+              }}
+            >
+              <div className="form-row">
+                <label htmlFor="person-name">Person Name</label>
+                <input
+                  id="person-name"
+                  type="text"
+                  value={form.personName}
+                  onChange={update("personName")}
+                  placeholder="Name"
+                />
+              </div>
+
+              <div className="form-row">
+                <label htmlFor="birth-place">Place</label>
+                <input
+                  id="birth-place"
+                  type="text"
+                  value={form.place}
+                  onChange={update("place")}
+                  placeholder="Birth place"
+                />
+              </div>
+
+              <div className="form-row">
+                <label htmlFor="birth-date">Birth Date</label>
+                <input
+                  id="birth-date"
+                  type="date"
+                  value={form.birthDate}
+                  onChange={update("birthDate")}
+                  required
+                />
+              </div>
+
+              <div className="form-row">
+                <label htmlFor="birth-time">Birth Time</label>
+                <input
+                  id="birth-time"
+                  type="time"
+                  value={form.birthTime}
+                  onChange={update("birthTime")}
+                />
+              </div>
+
+              <div className="form-actions">
+                <button
+                  className="secondary-btn"
+                  type="button"
+                  onClick={() => calculate({ saveProfile: true })}
+                  disabled={loading}
+                >
+                  Save
+                </button>
+                <button className="primary-btn" type="submit" disabled={loading}>
+                  {loading ? "Opening..." : "Open"}
+                </button>
+              </div>
+            </form>
+          ),
+        },
+      );
+    }
+
+    if (result?.aiTextGeo) {
+      items.push({
+        key: "record",
+        title: "RECORD",
+        content: <div className="reading-body">{result.aiTextGeo}</div>,
+      });
+    }
+
+    if (result?.aiTextHelio) {
+      items.push({
+        key: "gift",
+        title: "GIFT",
+        content: <div className="reading-body">{result.aiTextHelio}</div>,
+      });
+    }
+
+    if (result?.chartGeoUrl) {
+      items.push({
+        key: "chart",
+        title: "GEOCENTRIC",
+        content: (
+          <div className="reading-body">
+            <div className="chart-box">
+              <img src={result.chartGeoUrl} alt="Horoscope chart" />
+            </div>
+          </div>
+        ),
+      });
+    }
+
+    if (result?.resultGeo) {
+      items.push({
+        key: "geo",
+        title: "GEOCENTRIC",
+        content: <ResultTable rows={result.resultGeo} type="geo" />,
+      });
+    }
+
+    if (result?.resultHelio) {
+      items.push({
+        key: "helio",
+        title: "HELIOCENTRIC",
+        content: <ResultTable rows={result.resultHelio} type="helio" />,
+      });
+    }
+
+    return items;
+  }, [
+    calculate,
+    form.birthDate,
+    form.birthTime,
+    form.personName,
+    form.place,
+    isAuthenticated,
+    loading,
+    privateGroupedEntries,
+    publicGroupedEntries,
+    result,
+  ]);
+
+  const pageCount = pages.length;
+
+  useEffect(() => {
+    setCurrentPage((current) => Math.min(current, pageCount - 1));
+  }, [pageCount]);
 
   return (
     <>
-      <style>{`
-        * {
-          box-sizing: border-box;
-        }
-
-        html, body, #root {
-          margin: 0;
-          min-height: 100%;
-          font-family: "Segoe UI", "Hiragino Sans", "Yu Gothic UI", sans-serif;
-          background:
-            radial-gradient(circle at 15% 20%, rgba(196, 136, 255, 0.18), transparent 26%),
-            radial-gradient(circle at 82% 16%, rgba(126, 214, 255, 0.16), transparent 24%),
-            radial-gradient(circle at 50% 80%, rgba(117, 138, 255, 0.14), transparent 28%),
-            linear-gradient(180deg, #161b2d 0%, #252b46 45%, #32385a 100%);
-          color: #f2f4ff;
-        }
-
-        body{
-        
-        }
-
-        .app-shell {
-          position: relative;
-          min-height: 100vh;
-          overflow: hidden;
-        }
-
-        .star-layer {
-          position: absolute;
-          inset: 0;
-          pointer-events: none;
-          overflow: hidden;
-        }
-
-        .star {
-          position: absolute;
-          border-radius: 999px;
-          background: white;
-          animation: twinkle ease-in-out infinite;
-        }
-
-        .shooting-star {
-          position: absolute;
-          width: 150px;
-          height: 2px;
-          border-radius: 999px;
-          background: linear-gradient(
-            90deg,
-            rgba(255,255,255,0),
-            rgba(255,255,255,0.95),
-            rgba(255,255,255,0)
-          );
-          opacity: 0;
-          transform: rotate(-26deg);
-          filter:
-            drop-shadow(0 0 6px rgba(255,255,255,0.95))
-            drop-shadow(0 0 16px rgba(197, 225, 255, 0.65))
-            drop-shadow(0 0 26px rgba(184, 128, 255, 0.40));
-          animation: shooting ease-in-out infinite;
-        }
-
-        .shooting-star::after {
-          content: "";
-          position: absolute;
-          right: -2px;
-          top: 50%;
-          width: 10px;
-          height: 10px;
-          border-radius: 999px;
-          background: white;
-          transform: translateY(-50%);
-          box-shadow:
-            0 0 10px rgba(255,255,255,1),
-            0 0 20px rgba(255,255,255,0.75),
-            0 0 34px rgba(115, 206, 255, 0.55);
-        }
-
-        @keyframes twinkle {
-          0%, 100% {
-            opacity: 0.25;
-            transform: scale(0.85);
-          }
-          50% {
-            opacity: 1;
-            transform: scale(1.55);
-          }
-        }
-
-        @keyframes shooting {
-          0% {
-            opacity: 0;
-            transform: rotate(-26deg) translate3d(0, 0, 0);
-          }
-          10% {
-            opacity: 1;
-          }
-          35% {
-            opacity: 1;
-            transform: rotate(-26deg) translate3d(420px, 180px, 0);
-          }
-          100% {
-            opacity: 0;
-            transform: rotate(-26deg) translate3d(720px, 310px, 0);
-          }
-        }
-
-        .page-wrap {
-          position: relative;
-          z-index: 1;
-          min-height: 100%;
-          width: 100%;
-          margin: 0;
-          display: flex;
-          flex-direction: column;
-        }
-
-        .book-shell {
-          width: min(760px, calc(100vw - 28px));
-          height: calc(100vh - 80px);
-          margin: 18px auto 24px;
-          padding-top: 4px;
-          display: flex;
-          flex-direction: column;
-          perspective: 1600px;
-          position: relative;
-          overflow: hidden;
-        }
-
-        .book {
-          position: relative;
-          flex: 1;
-          min-height: 0;
-          width: 100%;
-        }
-
-        .book::before {
-          content: "";
-          position: absolute;
-          top: 0;
-          bottom: 0;
-          left: 0;
-          width: 34px;
-          z-index: 3;
-          border-radius: 8px;
-          background:
-            radial-gradient(circle at 10% 10%, #ffffff 1px, transparent 2px),
-            radial-gradient(circle at 25% 25%, #aeefff 1.5px, transparent 3px),
-            radial-gradient(circle at 40% 15%, #ffd6ff 2px, transparent 4px),
-            radial-gradient(circle at 60% 30%, #ffffff 1px, transparent 2px),
-            radial-gradient(circle at 80% 20%, #c8b6ff 1.5px, transparent 3px),
-            radial-gradient(circle at 15% 60%, #ffffff 2px, transparent 4px),
-            radial-gradient(circle at 35% 75%, #aeefff 1px, transparent 2px),
-            radial-gradient(circle at 55% 85%, #ffd6ff 1.5px, transparent 3px),
-            radial-gradient(circle at 75% 70%, #ffffff 2px, transparent 4px),
-            radial-gradient(circle at 90% 50%, #c8b6ff 1px, transparent 2px),
-            linear-gradient(to bottom, rgba(120,150,255,0.42), rgba(180,120,255,0.62));
-          box-shadow:
-            0 0 12px rgba(140, 160, 255, 0.55),
-            inset 0 0 6px rgba(255,255,255,0.2);
-          animation: spineSparkle 3s ease-in-out infinite alternate;
-        }
-
-        .book::after {
-          content: "";
-          position: absolute;
-          left: 27px;
-          top: 0;
-          bottom: 0;
-          width: 10px;
-          background: linear-gradient(to right, rgba(0,0,0,0.22), rgba(255,255,255,0.10));
-          z-index: 3;
-        }
-
-        @keyframes spineSparkle {
-          0% {
-            opacity: 0.65;
-            filter: brightness(0.92);
-          }
-          100% {
-            opacity: 1;
-            filter: brightness(1.28);
-          }
-        }
-
-        .page {
-          position: absolute;
-          inset: 0;
-          padding: 36px 44px 88px 48px;
-          margin-left: 18px;
-          border-radius: 22px;
-          background:
-            radial-gradient(circle at top left, rgba(143, 168, 255, 0.10), transparent 26%),
-            linear-gradient(135deg, #1f2238, #2a2f4d);
-          color: #f5f7ff;
-          box-shadow:
-            0 14px 34px rgba(0,0,0,0.28),
-            inset 0 1px 0 rgba(255,255,255,0.04);
-          border: 1px solid rgba(255,255,255,0.06);
-          transform-origin: left center;
-          backface-visibility: hidden;
-          transition: transform 0.8s ease, opacity 0.45s ease;
-          display: flex;
-          flex-direction: column;
-          overflow: hidden;
-        }
-
-        .page.hidden {
-          opacity: 0;
-          pointer-events: none;
-          transform: rotateY(-100deg);
-        }
-
-        .page.active {
-          opacity: 1;
-          transform: rotateY(0deg);
-          z-index: 2;
-        }
-
-        .page::after {
-          content: "";
-          position: absolute;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          height: 42px;
-          background: linear-gradient(to bottom, transparent, rgba(28, 31, 52, 0.9));
-          pointer-events: none;
-        }
-
-        .reading-title {
-          margin: 0 0 12px;
-          padding-left: 12px;
-          border-left: 4px solid #8fa8ff;
-          font-size: 24px;
-          font-weight: 700;
-          letter-spacing: 0.08em;
-          color: #f7f8ff;
-          text-shadow: 0 0 10px rgba(180, 190, 255, 0.24);
-          flex-shrink: 0;
-        }
-
-        .reading-subtitle {
-          margin: 0 0 18px;
-          padding-left: 12px;
-          font-size: 13px;
-          letter-spacing: 0.16em;
-          color: rgba(220, 228, 255, 0.72);
-          text-transform: uppercase;
-          flex-shrink: 0;
-        }
-
-        .index-book-page {
-          height: 100%;
-          min-height: 0;
-          display: flex;
-          flex-direction: column;
-          padding: 8px 10px 0;
-          border-radius: 18px;
-          background: rgba(255,255,255,0.03);
-          backdrop-filter: blur(4px);
-        }
-
-        .index-body,
-        .reading-body {
-          flex: 1;
-          min-height: 0;
-          overflow-y: auto;
-          scrollbar-width: none;
-          -ms-overflow-style: none;
-        }
-
-        .index-body::-webkit-scrollbar,
-        .reading-body::-webkit-scrollbar {
-          display: none;
-        }
-
-        .index-group {
-          margin-bottom: 28px;
-        }
-
-        .index-letter {
-          margin: 0 0 12px;
-          padding-bottom: 6px;
-          font-size: 22px;
-          font-weight: 600;
-          color: #d9deff;
-          border-bottom: 1px solid rgba(180, 190, 255, 0.22);
-          text-shadow: 0 0 8px rgba(170, 180, 255, 0.18);
-        }
-
-        .index-list {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-          gap: 10px 18px;
-        }
-
-        .index-name-btn {
-          width: 100%;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 12px;
-          padding: 10px 14px;
-          border: 1px solid rgba(180, 190, 255, 0.16);
-          border-radius: 12px;
-          background: rgba(255, 255, 255, 0.04);
-          color: #f5f7ff;
-          cursor: pointer;
-          transition: transform 0.2s ease, background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
-          text-align: left;
-          backdrop-filter: blur(3px);
-        }
-
-        .index-name-btn:hover {
-          transform: translateY(-1px);
-          background: rgba(255,255,255,0.08);
-          border-color: rgba(190, 200, 255, 0.34);
-          box-shadow: 0 6px 18px rgba(60, 80, 170, 0.18);
-        }
-
-        .index-name {
-          font-size: 15px;
-          font-weight: 500;
-          color: #ffffff;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-        }
-
-        .index-meta {
-          flex-shrink: 0;
-          font-size: 12px;
-          color: rgba(215, 222, 255, 0.65);
-        }
-
-        .form-card {
-          flex: 1;
-          min-height: 0;
-          display: flex;
-          flex-direction: column;
-          gap: 12px;
-          padding-top: 10px;
-        }
-
-        .form-row {
-          display: grid;
-          grid-template-columns: 130px 1fr;
-          align-items: center;
-          gap: 16px;
-        }
-
-        .form-row label {
-          font-size: 16px;
-          font-weight: 600;
-          color: #ffffff;
-        }
-
-        .form-row input {
-          width: 100%;
-          padding: 12px 14px;
-          border: 1px solid rgba(255,255,255,0.08);
-          border-radius: 12px;
-          background: rgba(255,255,255,0.14);
-          color: #ffffff;
-          font-size: 15px;
-        }
-
-        .form-row input:focus {
-          outline: none;
-          border-color: #8fa8ff;
-          box-shadow: 0 0 0 3px rgba(143, 168, 255, 0.18);
-        }
-
-        .form-actions {
-          margin-top: auto;
-          display: flex;
-          justify-content: flex-end;
-          gap: 12px;
-          padding-top: 20px;
-        }
-
-        .form-actions button,
-        .book-nav button {
-          border: none;
-          border-radius: 14px;
-          cursor: pointer;
-          color: white;
-          font-size: 16px;
-          font-weight: 600;
-          transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
-        }
-
-        .form-actions button:hover,
-        .book-nav button:hover {
-          transform: translateY(-1px);
-        }
-
-        .primary-btn {
-          padding: 12px 20px;
-          background: linear-gradient(135deg, #7f8cff, #97a8ff);
-          box-shadow: 0 6px 18px rgba(127, 140, 255, 0.28);
-        }
-
-        .secondary-btn {
-          padding: 12px 20px;
-          background: rgba(255,255,255,0.12);
-          color: #f5f7ff;
-          border: 1px solid rgba(255,255,255,0.08);
-        }
-
-        .reading-body {
-          white-space: pre-wrap;
-          line-height: 1.9;
-          font-size: 16px;
-          padding: 4px 6px 14px 18px;
-          color: rgba(245,247,255,0.93);
-          text-align: justify;
-        }
-
-        .result-table {
-          width: 100%;
-          border-collapse: collapse;
-          margin-top: 4px;
-        }
-
-        .result-table th,
-        .result-table td {
-          border-bottom: 1px solid rgba(255,255,255,0.16);
-          padding: 10px;
-          text-align: center;
-          word-break: break-word;
-        }
-
-        .result-table th {
-          background: rgba(255,255,255,0.08);
-          font-weight: 500;
-        }
-
-        .book-nav {
-          position: absolute;
-          left: 46px;
-          right: 10px;
-          bottom: 24px;
-          display: flex;
-          justify-content: space-between;
-          pointer-events: none;
-          z-index: 10;
-        }
-
-        .book-nav button {
-          pointer-events: auto;
-          width: 52px;
-          height: 52px;
-          border-radius: 999px;
-          background: linear-gradient(135deg, #7f8cff, #97a8ff);
-          box-shadow: 0 8px 20px rgba(0,0,0,0.25);
-          font-size: 22px;
-        }
-
-        .book-nav button:disabled {
-          opacity: 0.25;
-          cursor: default;
-          transform: none;
-        }
-
-        .footer {
-          text-align: center;
-          padding: 0 16px 18px;
-          color: #c3c7ff;
-          opacity: 0.72;
-          font-size: 14px;
-        }
-
-        @media (max-width: 760px) {
-          .book-shell {
-            width: calc(100vw - 18px);
-            height: calc(100vh - 100px);
-          }
-
-          .page {
-            padding: 26px 20px 88px 28px;
-            margin-left: 12px;
-          }
-
-          .form-row {
-            grid-template-columns: 1fr;
-            gap: 8px;
-          }
-
-          .reading-title {
-            font-size: 21px;
-          }
-
-          .index-list {
-            grid-template-columns: 1fr;
-          }
-
-          .book-nav {
-            left: 26px;
-          }
-        }
-      `}</style>
+      <style>{sharedStyles}</style>
 
       <div className="app-shell">
+        {error ? <div className="chart-error">{error}</div> : null}
+
         <div className="star-layer">
           {starStyles.map((style, i) => (
             <span key={i} className="star" style={style} />
@@ -617,7 +372,6 @@ export default function BookDesign() {
         </div>
 
         <div className="page-wrap">
-
           <div className="book-shell">
             <div className="book">
               {pages.map((page, index) => (
@@ -626,122 +380,751 @@ export default function BookDesign() {
                   className={`page ${index === currentPage ? "active" : "hidden"}`}
                 >
                   <h2 className="reading-title">{page.title}</h2>
-                  {page.subtitle && (
-                    <p className="reading-subtitle">{page.subtitle}</p>
-                  )}
-
-                  {page.type === "index" && (
-                    <div className="index-book-page">
-                      <div className="index-body">
-                        {Object.entries(groupedProfiles).map(([initial, items]) => (
-                          <section className="index-group" key={initial}>
-                            <h3 className="index-letter">{initial}</h3>
-                            <div className="index-list">
-                              {items.map((p) => (
-                                <button className="index-name-btn" key={p.id} type="button">
-                                  <span className="index-name">{p.person_name}</span>
-                                  <span className="index-meta">{p.birth_date}</span>
-                                </button>
-                              ))}
-                            </div>
-                          </section>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {page.type === "form" && (
-                    <div className="form-card">
-                      <div className="form-row">
-                        <label>Person Name</label>
-                        <input type="text" placeholder="Name" />
-                      </div>
-
-                      <div className="form-row">
-                        <label>Place</label>
-                        <input type="text" placeholder="Birth place" />
-                      </div>
-
-                      <div className="form-row">
-                        <label>Birth Date</label>
-                        <input type="date" />
-                      </div>
-
-                      <div className="form-row">
-                        <label>Birth Time</label>
-                        <input type="time" />
-                      </div>
-
-                      <div className="form-actions">
-                        <button className="secondary-btn" type="button">Save</button>
-                        <button className="primary-btn" type="button">Open</button>
-                      </div>
-                    </div>
-                  )}
-
-                  {page.type === "text" && (
-                    <div className="reading-body">{page.body}</div>
-                  )}
-
-                  {page.type === "table" && (
-                    <div className="reading-body">
-                      <table className="result-table">
-                        <thead>
-                          <tr>
-                            <th>天体</th>
-                            <th>Meaning</th>
-                            <th>サイン</th>
-                            <th>年齢</th>
-                            <th>サビアンシンボル</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          <tr>
-                            <td>Sun</td>
-                            <td>Self</td>
-                            <td>Aries 12°</td>
-                            <td>24</td>
-                            <td>A triangularly shaped flight of wild geese</td>
-                          </tr>
-                          <tr>
-                            <td>Moon</td>
-                            <td>Emotion</td>
-                            <td>Libra 4°</td>
-                            <td>18</td>
-                            <td>A group around a campfire</td>
-                          </tr>
-                          <tr>
-                            <td>Mercury</td>
-                            <td>Mind</td>
-                            <td>Scorpio 21°</td>
-                            <td>13</td>
-                            <td>Obeying the call of duty</td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
+                  {page.subtitle ? <p className="reading-subtitle">{page.subtitle}</p> : null}
+                  {page.content}
                 </section>
               ))}
 
               <div className="book-nav">
-                <button onClick={goPrev} disabled={currentPage === 0} type="button">
-                  ←
-                </button>
                 <button
-                  onClick={goNext}
-                  disabled={currentPage === pages.length - 1}
+                  onClick={() => setCurrentPage((page) => Math.max(0, page - 1))}
+                  disabled={currentPage === 0}
                   type="button"
                 >
-                  →
+                  {"<"}
+                </button>
+                <button
+                  onClick={() =>
+                    setCurrentPage((page) => Math.min(pageCount - 1, page + 1))
+                  }
+                  disabled={currentPage === pageCount - 1}
+                  type="button"
+                >
+                  {">"}
                 </button>
               </div>
             </div>
           </div>
 
-          <footer className="footer">© 2025 Horoscope App</footer>
+          <footer className="footer">・ゑｽｩ 2025 Horoscope App</footer>
         </div>
       </div>
     </>
   );
 }
+
+function ProfileIndex({ entries, emptyMessage, interactive = false, onSelect, note }) {
+  return (
+    <div className="index-book-page">
+      {note ? <p className="index-note">{note}</p> : null}
+      <div className="index-body">
+        {entries.length === 0 ? (
+          <p className="reading-muted">{emptyMessage}</p>
+        ) : (
+          entries.map(([initial, items]) => (
+            <section className="index-group" key={initial}>
+              <h3 className="index-letter">{initial}</h3>
+              <div className="index-list">
+                {items.map((profile) =>
+                  interactive ? (
+                    <button
+                      className="index-name-btn"
+                      key={profile.id}
+                      type="button"
+                      disabled={!interactive}
+                      onClick={() => onSelect?.(profile)}
+                    >
+                      <span className="index-name">{profile.personName}</span>
+                      <span className="index-meta">{profile.birthDate}</span>
+                    </button>
+                  ) : (
+                    <div className="index-name-btn index-name-btn-static" key={profile.id}>
+                      <span className="index-name">{profile.personName}</span>
+                      <span className="index-meta">{profile.birthDate}</span>
+                    </div>
+                  ),
+                )}
+              </div>
+            </section>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ResultTable({ rows, type }) {
+  return (
+    <div className="reading-body">
+      <table className="result-table">
+        <thead>
+          <tr>
+            <th>Planet</th>
+            <th>Meaning</th>
+            <th>Sign</th>
+            <th>Degree</th>
+            <th>Sabian</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, index) => (
+            <tr key={`${row[0]}-${index}`}>
+              {type === "geo" ? (
+                <>
+                  <td>{row[0]}</td>
+                  <td>{row[6]}</td>
+                  <td>
+                    {row[1]} {row[2]}
+                  </td>
+                  <td>{row[5]}</td>
+                  <td>{row[4]}</td>
+                </>
+              ) : (
+                <>
+                  <td>{row[0]}</td>
+                  <td>{row[4]}</td>
+                  <td>{row[1]}</td>
+                  <td>{row[2]}</td>
+                  <td>{row[3]}</td>
+                </>
+              )}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+const sharedStyles = `
+  * {
+    box-sizing: border-box;
+  }
+
+  html, body, #root {
+    margin: 0;
+    min-height: 100%;
+    font-family: "Segoe UI", "Hiragino Sans", "Yu Gothic UI", sans-serif;
+    background:
+      radial-gradient(circle at 15% 20%, rgba(196, 136, 255, 0.18), transparent 26%),
+      radial-gradient(circle at 82% 16%, rgba(126, 214, 255, 0.16), transparent 24%),
+      radial-gradient(circle at 50% 80%, rgba(117, 138, 255, 0.14), transparent 28%),
+      linear-gradient(180deg, #161b2d 0%, #252b46 45%, #32385a 100%);
+    color: #f2f4ff;
+  }
+
+  .app-shell {
+    position: relative;
+    min-height: calc(100vh - 81px);
+    overflow: hidden;
+  }
+
+  .star-layer {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    overflow: hidden;
+  }
+
+  .star {
+    position: absolute;
+    border-radius: 999px;
+    background: white;
+    animation: twinkle ease-in-out infinite;
+  }
+
+  .shooting-star {
+    position: absolute;
+    width: 150px;
+    height: 2px;
+    border-radius: 999px;
+    background: linear-gradient(
+      90deg,
+      rgba(255,255,255,0),
+      rgba(255,255,255,0.95),
+      rgba(255,255,255,0)
+    );
+    opacity: 0;
+    transform: rotate(-26deg);
+    filter:
+      drop-shadow(0 0 6px rgba(255,255,255,0.95))
+      drop-shadow(0 0 16px rgba(197, 225, 255, 0.65))
+      drop-shadow(0 0 26px rgba(184, 128, 255, 0.40));
+    animation: shooting ease-in-out infinite;
+  }
+
+  .shooting-star::after {
+    content: "";
+    position: absolute;
+    right: -2px;
+    top: 50%;
+    width: 10px;
+    height: 10px;
+    border-radius: 999px;
+    background: white;
+    transform: translateY(-50%);
+    box-shadow:
+      0 0 10px rgba(255,255,255,1),
+      0 0 20px rgba(255,255,255,0.75),
+      0 0 34px rgba(115, 206, 255, 0.55);
+  }
+
+  @keyframes twinkle {
+    0%, 100% {
+      opacity: 0.25;
+      transform: scale(0.85);
+    }
+    50% {
+      opacity: 1;
+      transform: scale(1.55);
+    }
+  }
+
+  @keyframes shooting {
+    0% {
+      opacity: 0;
+      transform: rotate(-26deg) translate3d(0, 0, 0);
+    }
+    10% {
+      opacity: 1;
+    }
+    35% {
+      opacity: 1;
+      transform: rotate(-26deg) translate3d(420px, 180px, 0);
+    }
+    100% {
+      opacity: 0;
+      transform: rotate(-26deg) translate3d(720px, 310px, 0);
+    }
+  }
+
+  .page-wrap {
+    position: relative;
+    z-index: 1;
+    min-height: 100%;
+    width: 100%;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .chart-error {
+    width: min(760px, calc(100vw - 28px));
+    margin: 18px auto 0;
+    padding: 12px 16px;
+    border-radius: 14px;
+    border: 1px solid rgba(255,255,255,0.08);
+    background: rgba(167, 70, 93, 0.16);
+    color: #ffdce4;
+    backdrop-filter: blur(6px);
+  }
+
+  .book-shell {
+    width: min(760px, calc(100vw - 28px));
+    height: calc(100vh - 80px);
+    margin: 18px auto 24px;
+    padding-top: 4px;
+    display: flex;
+    flex-direction: column;
+    perspective: 1600px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .book {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    width: 100%;
+  }
+
+  .book::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 34px;
+    z-index: 3;
+    border-radius: 8px;
+    background:
+      radial-gradient(circle at 10% 10%, #ffffff 1px, transparent 2px),
+      radial-gradient(circle at 25% 25%, #aeefff 1.5px, transparent 3px),
+      radial-gradient(circle at 40% 15%, #ffd6ff 2px, transparent 4px),
+      radial-gradient(circle at 60% 30%, #ffffff 1px, transparent 2px),
+      radial-gradient(circle at 80% 20%, #c8b6ff 1.5px, transparent 3px),
+      radial-gradient(circle at 15% 60%, #ffffff 2px, transparent 4px),
+      radial-gradient(circle at 35% 75%, #aeefff 1px, transparent 2px),
+      radial-gradient(circle at 55% 85%, #ffd6ff 1.5px, transparent 3px),
+      radial-gradient(circle at 75% 70%, #ffffff 2px, transparent 4px),
+      radial-gradient(circle at 90% 50%, #c8b6ff 1px, transparent 2px),
+      linear-gradient(to bottom, rgba(120,150,255,0.42), rgba(180,120,255,0.62));
+    box-shadow:
+      0 0 12px rgba(140, 160, 255, 0.55),
+      inset 0 0 6px rgba(255,255,255,0.2);
+    animation: spineSparkle 3s ease-in-out infinite alternate;
+  }
+
+  .book::after {
+    content: "";
+    position: absolute;
+    left: 27px;
+    top: 0;
+    bottom: 0;
+    width: 10px;
+    background: linear-gradient(to right, rgba(0,0,0,0.22), rgba(255,255,255,0.10));
+    z-index: 3;
+  }
+
+  @keyframes spineSparkle {
+    0% {
+      opacity: 0.65;
+      filter: brightness(0.92);
+    }
+    100% {
+      opacity: 1;
+      filter: brightness(1.28);
+    }
+  }
+
+  .page {
+    position: absolute;
+    inset: 0;
+    padding: 36px 44px 88px 48px;
+    margin-left: 18px;
+    border-radius: 22px;
+    background:
+      radial-gradient(circle at top left, rgba(143, 168, 255, 0.10), transparent 26%),
+      linear-gradient(135deg, #1f2238, #2a2f4d);
+    color: #f5f7ff;
+    box-shadow:
+      0 14px 34px rgba(0,0,0,0.28),
+      inset 0 1px 0 rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.06);
+    transform-origin: left center;
+    backface-visibility: hidden;
+    transition: transform 0.8s ease, opacity 0.45s ease;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .page.hidden {
+    opacity: 0;
+    pointer-events: none;
+    transform: rotateY(-100deg);
+  }
+
+  .page.active {
+    opacity: 1;
+    transform: rotateY(0deg);
+    z-index: 2;
+  }
+
+  .page::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 42px;
+    background: linear-gradient(to bottom, transparent, rgba(28, 31, 52, 0.9));
+    pointer-events: none;
+  }
+
+  .reading-title {
+    margin: 0 0 12px;
+    padding-left: 12px;
+    border-left: 4px solid #8fa8ff;
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: #f7f8ff;
+    text-shadow: 0 0 10px rgba(180, 190, 255, 0.24);
+    flex-shrink: 0;
+  }
+
+  .reading-subtitle {
+    margin: 0 0 18px;
+    padding-left: 12px;
+    font-size: 13px;
+    letter-spacing: 0.16em;
+    color: rgba(220, 228, 255, 0.72);
+    text-transform: uppercase;
+    flex-shrink: 0;
+  }
+
+  .index-book-page {
+    height: 100%;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    padding: 8px 10px 0;
+    border-radius: 18px;
+    background: rgba(255,255,255,0.03);
+    backdrop-filter: blur(4px);
+  }
+
+  .index-note {
+    margin: 0 0 14px;
+    font-size: 12px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: rgba(220, 228, 255, 0.72);
+  }
+
+  .index-body,
+  .reading-body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .index-body::-webkit-scrollbar,
+  .reading-body::-webkit-scrollbar {
+    display: none;
+  }
+
+  .reading-muted {
+    margin: 0;
+    color: rgba(220, 228, 255, 0.72);
+  }
+
+  .index-group {
+    margin-bottom: 28px;
+  }
+
+  .index-letter {
+    margin: 0 0 12px;
+    padding-bottom: 6px;
+    font-size: 22px;
+    font-weight: 600;
+    color: #d9deff;
+    border-bottom: 1px solid rgba(180, 190, 255, 0.22);
+    text-shadow: 0 0 8px rgba(170, 180, 255, 0.18);
+  }
+
+  .index-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 10px 18px;
+  }
+
+  .index-name-btn {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 14px;
+    border: 1px solid rgba(180, 190, 255, 0.16);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.04);
+    color: #f5f7ff;
+    cursor: pointer;
+    transition: transform 0.2s ease, background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+    text-align: left;
+    backdrop-filter: blur(3px);
+  }
+
+  .index-name-btn:hover {
+    transform: translateY(-1px);
+    background: rgba(255,255,255,0.08);
+    border-color: rgba(190, 200, 255, 0.34);
+    box-shadow: 0 6px 18px rgba(60, 80, 170, 0.18);
+  }
+
+  .index-name-btn-static {
+    cursor: default;
+  }
+
+  .index-name-btn-static:hover {
+    transform: none;
+    background: rgba(255,255,255,0.04);
+    border-color: rgba(180, 190, 255, 0.16);
+    box-shadow: none;
+  }
+
+  .index-name-btn:disabled {
+    opacity: 0.65;
+    cursor: default;
+    transform: none;
+    box-shadow: none;
+  }
+
+  .index-name {
+    font-size: 15px;
+    font-weight: 500;
+    color: #ffffff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .index-meta {
+    flex-shrink: 0;
+    font-size: 12px;
+    color: rgba(215, 222, 255, 0.65);
+  }
+
+  .guest-card {
+    border-radius: 22px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    padding: 8px 10px 0;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .guest-eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 14px;
+    color: rgba(220, 228, 255, 0.82);
+    letter-spacing: 0.18em;
+    font-size: 12px;
+    text-transform: uppercase;
+  }
+
+  .guest-title {
+    margin: 0;
+    font-size: clamp(28px, 4vw, 46px);
+    line-height: 1.15;
+    color: #f7f8ff;
+  }
+
+  .guest-subtitle {
+    margin: 8px 0 0;
+    font-size: clamp(20px, 2.8vw, 20px);
+    line-height: 1.15;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: #fff6fb;
+    text-shadow: 0 0 10px rgba(189, 171, 255, 0.16);
+  }
+
+  .guest-text {
+    margin: 18px 0 0;
+    max-width: 56rem;
+    line-height: 2;
+    color: rgba(245,247,255,0.9);
+    font-size: 15px;
+  }
+
+  .guest-actions {
+    margin-top: 28px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .guest-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 12px 20px;
+    border-radius: 999px;
+    border: 1px solid rgba(255,255,255,0.08);
+    background: linear-gradient(135deg, #7f8cff, #97a8ff);
+    color: white;
+    font-weight: 600;
+    text-decoration: none;
+  }
+
+  .form-card {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding-top: 10px;
+  }
+
+  .form-row {
+    display: grid;
+    grid-template-columns: 130px 1fr;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .form-row label {
+    font-size: 16px;
+    font-weight: 600;
+    color: #ffffff;
+  }
+
+  .form-row input {
+    width: 100%;
+    padding: 12px 14px;
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px;
+    background: rgba(255,255,255,0.14);
+    color: #ffffff;
+    font-size: 15px;
+  }
+
+  .form-row input:focus {
+    outline: none;
+    border-color: #8fa8ff;
+    box-shadow: 0 0 0 3px rgba(143, 168, 255, 0.18);
+  }
+
+  .form-actions {
+    margin-top: auto;
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    padding-top: 20px;
+  }
+
+  .form-actions button,
+  .book-nav button {
+    border: none;
+    border-radius: 14px;
+    cursor: pointer;
+    color: white;
+    font-size: 16px;
+    font-weight: 600;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+  }
+
+  .form-actions button:hover,
+  .book-nav button:hover {
+    transform: translateY(-1px);
+  }
+
+  .primary-btn {
+    padding: 12px 20px;
+    background: linear-gradient(135deg, #7f8cff, #97a8ff);
+    box-shadow: 0 6px 18px rgba(127, 140, 255, 0.28);
+  }
+
+  .secondary-btn {
+    padding: 12px 20px;
+    background: rgba(255,255,255,0.12);
+    color: #f5f7ff;
+    border: 1px solid rgba(255,255,255,0.08);
+  }
+
+  .reading-body {
+    white-space: pre-wrap;
+    line-height: 1.9;
+    font-size: 16px;
+    padding: 4px 6px 14px 18px;
+    color: rgba(245,247,255,0.93);
+    text-align: justify;
+  }
+
+  .chart-box {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-height: 100%;
+    padding: 4px 0 14px;
+  }
+
+  .chart-box img {
+    display: block;
+    max-width: 100%;
+    max-height: calc(100vh - 260px);
+    object-fit: contain;
+    border-radius: 18px;
+    box-shadow:
+      0 18px 44px rgba(0,0,0,0.28),
+      0 0 0 1px rgba(255,255,255,0.06);
+  }
+
+  .result-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 4px;
+  }
+
+  .result-table th,
+  .result-table td {
+    border-bottom: 1px solid rgba(255,255,255,0.16);
+    padding: 10px;
+    text-align: center;
+    word-break: break-word;
+  }
+
+  .result-table th {
+    background: rgba(255,255,255,0.08);
+    font-weight: 500;
+  }
+
+  .book-nav {
+    position: absolute;
+    left: 46px;
+    right: 10px;
+    bottom: 24px;
+    display: flex;
+    justify-content: space-between;
+    pointer-events: none;
+    z-index: 10;
+  }
+
+  .book-nav button {
+    pointer-events: auto;
+    width: 52px;
+    height: 52px;
+    border-radius: 999px;
+    background: linear-gradient(135deg, #7f8cff, #97a8ff);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.25);
+    font-size: 22px;
+  }
+
+  .book-nav button:disabled {
+    opacity: 0.25;
+    cursor: default;
+    transform: none;
+  }
+
+  .footer {
+    text-align: center;
+    padding: 0 16px 18px;
+    color: #c3c7ff;
+    opacity: 0.72;
+    font-size: 14px;
+  }
+
+  @media (max-width: 760px) {
+    .book-shell {
+      width: calc(100vw - 18px);
+      height: calc(100vh - 100px);
+    }
+
+    .page {
+      padding: 26px 20px 88px 28px;
+      margin-left: 12px;
+    }
+
+    .form-row {
+      grid-template-columns: 1fr;
+      gap: 8px;
+    }
+
+    .reading-title {
+      font-size: 21px;
+    }
+
+    .index-list {
+      grid-template-columns: 1fr;
+    }
+
+    .book-nav {
+      left: 26px;
+    }
+
+    .chart-box img {
+      max-height: calc(100vh - 310px);
+    }
+  }
+`;
+

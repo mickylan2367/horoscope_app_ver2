@@ -19,7 +19,7 @@ export default function RegisterPage({ onAuth }) {
         body: JSON.stringify(form),
       });
       onAuth(user);
-      navigate("/diary");
+      navigate("/home");
     } catch (err) {
       setError(err.message || "Registration failed.");
     }

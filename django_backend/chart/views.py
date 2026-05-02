@@ -12,11 +12,13 @@ from datetime import datetime, time as dtime
 from .forms import HoroscopeForm, HelioForm, HoroscopeProfile
 import hashlib
 from django.core.cache import cache
+from django.core.exceptions import PermissionDenied
 from openai import OpenAI
 import json
 from pathlib import Path
 from collections import OrderedDict
 import re
+from django.db.models import Q
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
@@ -275,12 +277,13 @@ def horoscope_view(request):
     ai_text_geo = None
 
     # 🔥 追加：登録済みプロフィール一覧
-    profiles = HoroscopeProfile.objects.all().order_by('person_name')
+    profiles = _visible_profiles_queryset(request.user)
     grouped_profiles = make_profiles_dict() 
     for p in profiles:
         key = get_group_key(p.person_name)
         grouped_profiles[key].append(p)
     form = HoroscopeForm(request.POST)
+    form.fields["profile"].queryset = profiles
 
     if request.method == 'POST':
         action = request.POST.get('action', 'calculate')
@@ -290,7 +293,7 @@ def horoscope_view(request):
 
         if profile_id:
             # ===== 一覧から直接取得する場合 =====
-            profile = HoroscopeProfile.objects.get(id=profile_id)
+            profile = _get_accessible_profile(profile_id, request.user)
 
             person_name = profile.person_name
             place = profile.place
@@ -360,7 +363,7 @@ def horoscope_view(request):
         )
 
 
-        saved = HoroscopeResult.objects.filter(cache_key=cache_key).first()
+        saved = _get_result_queryset(request.user, cache_key).first()
         if saved:
             print("DBから取得しました")
             data = saved.result_json
@@ -371,8 +374,9 @@ def horoscope_view(request):
             ai_text_helio = data.get("ai_text_helio")
 
 
-            if action == 'save':
+            if action == 'save' and request.user.is_authenticated:
                 HoroscopeProfile.objects.get_or_create(
+                    user=request.user if request.user.is_authenticated else None,
                     person_name=person_name,
                     birth_date=birth_date,
                     birth_time=birth_time,
@@ -380,6 +384,7 @@ def horoscope_view(request):
                         'place': place,
                         'lat': lat,
                         'lon': lon,
+                        'is_public': False,
                     }
                 )
 
@@ -402,7 +407,7 @@ def horoscope_view(request):
                 'chart/form.html',
                 {
                     'form': form,
-                    'profiles': HoroscopeProfile.objects.all().order_by('person_name'),
+                    'profiles': profiles,
                     'grouped_profiles': grouped_profiles,
                     'result_geo': result_geo,
                     'result_helio': result_helio,
@@ -452,8 +457,9 @@ def horoscope_view(request):
             geo_payload = build_geo_ai_payload(result_geo)
             ai_text_geo = generate_ai_reading_geo(geo_payload)
 
-        if action == 'save':
+        if action == 'save' and request.user.is_authenticated:
             HoroscopeProfile.objects.get_or_create(
+                user=request.user if request.user.is_authenticated else None,
                 person_name=person_name,
                 birth_date=birth_date,
                 birth_time=birth_time,
@@ -461,6 +467,7 @@ def horoscope_view(request):
                     'place': place,
                     'lat': lat,
                     'lon': lon,
+                    'is_public': False,
                 }
             )
 
@@ -473,6 +480,7 @@ def horoscope_view(request):
         }
 
         HoroscopeResult.objects.create(
+            user=_result_owner_for_user(request.user),
             cache_key=cache_key,
             result_json=result_json,
         )
@@ -499,6 +507,7 @@ def horoscope_view(request):
 def _profile_to_json(profile):
     return {
         "id": profile.pk,
+        "userId": profile.user_id,
         "personName": profile.person_name,
         "person_name": profile.person_name,
         "place": profile.place,
@@ -508,13 +517,57 @@ def _profile_to_json(profile):
         "birth_time": profile.birth_time.isoformat(timespec="minutes") if profile.birth_time else "",
         "lat": profile.lat,
         "lon": profile.lon,
+        "isPublic": profile.is_public,
+        "is_public": profile.is_public,
     }
+
+
+def _public_profiles_queryset():
+    return HoroscopeProfile.objects.filter(is_public=True).order_by("person_name")
+
+
+def _private_profiles_queryset(user):
+    if not user.is_authenticated:
+        return HoroscopeProfile.objects.none()
+    return HoroscopeProfile.objects.filter(user=user, is_public=False).order_by("person_name")
+
+
+def _visible_profiles_queryset(user):
+    if not user.is_authenticated:
+        return _public_profiles_queryset()
+    return HoroscopeProfile.objects.filter(Q(is_public=True) | Q(user=user)).order_by("person_name")
+
+
+def _get_accessible_profile(profile_id, user):
+    profile = HoroscopeProfile.objects.filter(pk=profile_id).first()
+    if profile is None:
+        raise HoroscopeProfile.DoesNotExist
+    if profile.is_public:
+        return profile
+    if user.is_authenticated and profile.user_id == user.id:
+        return profile
+    raise PermissionDenied("You do not have access to this profile.")
+
+
+def _result_owner_for_user(user):
+    return user if user.is_authenticated else None
+
+
+def _get_result_queryset(user, cache_key):
+    return HoroscopeResult.objects.filter(cache_key=cache_key, user=_result_owner_for_user(user))
 
 
 @require_http_methods(["GET"])
 def api_chart_profiles(request):
-    profiles = HoroscopeProfile.objects.all().order_by("person_name")
-    return JsonResponse([_profile_to_json(profile) for profile in profiles], safe=False)
+    public_profiles = _public_profiles_queryset()
+    private_profiles = _private_profiles_queryset(request.user)
+    return JsonResponse(
+        {
+            "authenticated": request.user.is_authenticated,
+            "publicProfiles": [_profile_to_json(profile) for profile in public_profiles],
+            "privateProfiles": [_profile_to_json(profile) for profile in private_profiles],
+        }
+    )
 
 
 def _parse_birth_time(value):
@@ -523,11 +576,11 @@ def _parse_birth_time(value):
     return dtime.fromisoformat(value)
 
 
-def _calculate_chart(data, include_ai=False, save_profile=False):
+def _calculate_chart(data, user, include_ai=False, save_profile=False):
     profile = None
     profile_id = data.get("profileId") or data.get("profile_id")
     if profile_id:
-        profile = HoroscopeProfile.objects.get(pk=profile_id)
+        profile = _get_accessible_profile(profile_id, user)
 
     if profile:
         person_name = profile.person_name
@@ -554,7 +607,7 @@ def _calculate_chart(data, include_ai=False, save_profile=False):
         lon=lon,
     )
 
-    saved = HoroscopeResult.objects.filter(cache_key=cache_key).first()
+    saved = _get_result_queryset(user, cache_key).first()
     if saved:
         result_json = saved.result_json
         if include_ai and (not result_json.get("ai_text_geo") or not result_json.get("ai_text_helio")):
@@ -602,14 +655,27 @@ def _calculate_chart(data, include_ai=False, save_profile=False):
             result_json["ai_text_helio"] = generate_ai_reading_helio(build_helio_ai_payload(result_helio))
             result_json["ai_text_geo"] = generate_ai_reading_geo(build_geo_ai_payload(result_geo))
 
-        saved = HoroscopeResult.objects.create(cache_key=cache_key, result_json=result_json)
+        saved = HoroscopeResult.objects.create(
+            user=_result_owner_for_user(user),
+            cache_key=cache_key,
+            result_json=result_json,
+        )
 
     if save_profile:
+        if not user.is_authenticated:
+            raise PermissionDenied("Login required to save chart profiles.")
+
         HoroscopeProfile.objects.get_or_create(
+            user=user,
             person_name=person_name,
             birth_date=birth_date,
             birth_time=birth_time,
-            defaults={"place": place, "lat": lat, "lon": lon},
+            defaults={
+                "place": place,
+                "lat": lat,
+                "lon": lon,
+                "is_public": False,
+            },
         )
 
     return {
@@ -637,12 +703,15 @@ def api_chart_calculate(request):
         data = json.loads(request.body)
         payload = _calculate_chart(
             data,
+            request.user,
             include_ai=bool(data.get("includeAi") or data.get("include_ai")),
             save_profile=bool(data.get("saveProfile") or data.get("save_profile")),
         )
         return JsonResponse(payload)
     except HoroscopeProfile.DoesNotExist:
         return JsonResponse({"error": "Profile not found"}, status=404)
+    except PermissionDenied as exc:
+        return JsonResponse({"error": str(exc)}, status=403)
     except Exception as exc:
         return JsonResponse({"error": str(exc)}, status=400)
 
@@ -650,10 +719,14 @@ def api_chart_calculate(request):
 @require_http_methods(["POST"])
 def api_chart_profile_create(request):
     try:
+        if not request.user.is_authenticated:
+            return JsonResponse({"error": "Login required"}, status=401)
+
         data = json.loads(request.body)
         birth_date = datetime.fromisoformat(data.get("birthDate") or data.get("birth_date")).date()
         birth_time = _parse_birth_time(data.get("birthTime") or data.get("birth_time"))
         profile, created = HoroscopeProfile.objects.get_or_create(
+            user=request.user,
             person_name=data.get("personName") or data.get("person_name") or "",
             birth_date=birth_date,
             birth_time=birth_time,
@@ -661,8 +734,11 @@ def api_chart_profile_create(request):
                 "place": data.get("place") or "",
                 "lat": data.get("lat"),
                 "lon": data.get("lon"),
+                "is_public": False,
             },
         )
         return JsonResponse(_profile_to_json(profile), status=201 if created else 200)
+    except PermissionDenied as exc:
+        return JsonResponse({"error": str(exc)}, status=403)
     except Exception as exc:
         return JsonResponse({"error": str(exc)}, status=400)

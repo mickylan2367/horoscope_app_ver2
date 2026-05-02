@@ -18,7 +18,7 @@ export default function LoginPage({ onAuth }) {
         body: JSON.stringify({ username, password }),
       });
       onAuth(user);
-      navigate("/diary");
+      navigate("/home");
     } catch (err) {
       setError(err.message || "Login failed.");
     }
