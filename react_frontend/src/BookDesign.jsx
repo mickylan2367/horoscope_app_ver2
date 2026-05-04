@@ -1,5 +1,5 @@
 ﻿import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { LucideHeading3, Sparkles } from "lucide-react";
 import { apiFetch } from "./api";
 
@@ -33,13 +33,16 @@ const sortGroupedEntries = (groups) =>
   });
 
 export default function BookDesign({ user }) {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [profilesData, setProfilesData] = useState({
     publicProfiles: [],
     privateProfiles: [],
   });
   const [form, setForm] = useState(emptyForm);
+  const [selectedProfile, setSelectedProfile] = useState(null);
   const [result, setResult] = useState(null);
-  const [currentPage, setCurrentPage] = useState(0);
+  const [currentPage, setCurrentPage] = useState(() => location.state?.page ?? 0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -87,6 +90,12 @@ export default function BookDesign({ user }) {
     }
   }, [isAuthenticated]);
 
+  useEffect(() => {
+    if (typeof location.state?.page === "number") {
+      setCurrentPage(location.state.page);
+    }
+  }, [location.state?.page]);
+
   const publicGroupedEntries = useMemo(
     () => sortGroupedEntries(groupProfiles(profilesData.publicProfiles)),
     [profilesData.publicProfiles],
@@ -100,6 +109,79 @@ export default function BookDesign({ user }) {
   const update = (key) => (event) => {
     setForm((current) => ({ ...current, [key]: event.target.value }));
   };
+
+  const refreshProfiles = useCallback(async () => {
+    const nextProfiles = await apiFetch("/api/chart/profiles/");
+    setProfilesData({
+      publicProfiles: nextProfiles.publicProfiles ?? [],
+      privateProfiles: nextProfiles.privateProfiles ?? [],
+    });
+  }, []);
+
+  const openProfileForEdit = useCallback((profile) => {
+    setForm({
+      personName: profile.personName ?? "",
+      place: profile.place ?? "",
+      birthDate: profile.birthDate ?? "",
+      birthTime: profile.birthTime ?? "",
+    });
+    setSelectedProfile(profile);
+    setResult(null);
+    setError("");
+    setCurrentPage(4);
+  }, []);
+
+  const saveProfile = useCallback(async () => {
+    if (!isAuthenticated) {
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+    try {
+      const payload = {
+        personName: form.personName,
+        place: form.place,
+        birthDate: form.birthDate,
+        birthTime: form.birthTime,
+      };
+
+      const endpoint = selectedProfile?.id
+        ? "/api/chart/profiles/update/"
+        : "/api/chart/profiles/create/";
+      const body = {
+        ...payload,
+        ...(selectedProfile?.id ? { profileId: selectedProfile.id } : {}),
+        ...(
+          selectedProfile &&
+          selectedProfile.place === form.place &&
+          selectedProfile.lat != null &&
+          selectedProfile.lon != null
+            ? { lat: selectedProfile.lat, lon: selectedProfile.lon }
+            : {}
+        ),
+      };
+
+      const savedProfile = await apiFetch(endpoint, {
+        method: "POST",
+        body: JSON.stringify(body),
+      });
+
+      setSelectedProfile(savedProfile);
+      setForm({
+        personName: savedProfile.personName ?? payload.personName,
+        place: savedProfile.place ?? payload.place,
+        birthDate: savedProfile.birthDate ?? payload.birthDate,
+        birthTime: savedProfile.birthTime ?? payload.birthTime,
+      });
+      await refreshProfiles();
+      setCurrentPage(4);
+    } catch (err) {
+      setError(err.message || "Failed to save profile.");
+    } finally {
+      setLoading(false);
+    }
+  }, [form.birthDate, form.birthTime, form.personName, form.place, isAuthenticated, refreshProfiles, selectedProfile]);
 
   const calculate = useCallback(
     async ({ includeAi = false, saveProfile = false, profileId = null } = {}) => {
@@ -118,13 +200,9 @@ export default function BookDesign({ user }) {
           body: JSON.stringify(payload),
         });
         setResult(data);
-        setCurrentPage(isAuthenticated ? 4 : 2);
+        setCurrentPage(isAuthenticated ? 5 : 3);
         if (saveProfile) {
-          const nextProfiles = await apiFetch("/api/chart/profiles/");
-          setProfilesData({
-            publicProfiles: nextProfiles.publicProfiles ?? [],
-            privateProfiles: nextProfiles.privateProfiles ?? [],
-          });
+          await refreshProfiles();
         }
       } catch (err) {
         setError(err.message || "Chart calculation failed.");
@@ -132,7 +210,7 @@ export default function BookDesign({ user }) {
         setLoading(false);
       }
     },
-    [form, isAuthenticated],
+    [form, isAuthenticated, refreshProfiles],
   );
 
   const pages = useMemo(() => {
@@ -168,23 +246,74 @@ export default function BookDesign({ user }) {
               When you sign in, your own records appear, along with saved horoscopes and new readings that continue your journey through the stars.
             </p>
             <div className="guest-actions">
-              <Link className="guest-button" to="/home">
-                Homeへ戻る
+              <Link
+                className="guest-button"
+                to="/chart/warp"
+                state={{ source: "close-book", target: "/" }}
+              >
+                CLOSE
               </Link>
             </div>
           </div>
         ),
       },
       {
+        key: "chooser",
+        title: "INDEX",
+        subtitle: "select page",
+        content: (
+          <div className="chooser-page">
+            <div className="chooser-grid">
+              <button
+                type="button"
+                className="chooser-card"
+                onClick={() => setCurrentPage(2)}
+              >
+                <div className="chooser-media" aria-hidden="true">
+                  <div className="chooser-media-frame chooser-media-chart">
+                    <div className="chooser-media-glow" />
+                  </div>
+                </div>
+                <div className="chooser-copy">
+                  <div className="chooser-eyebrow">Chart</div>
+                  <h3>Open Akashic Index</h3>
+                  <p>
+                    Continue with the current chart app pages and open the shared free index.
+                  </p>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                className="chooser-card"
+                onClick={() => navigate("/diary/warp", { state: { target: "/diary" } })}
+              >
+                <div className="chooser-media" aria-hidden="true">
+                  <div className="chooser-media-frame chooser-media-diary">
+                    <div className="chooser-media-glow" />
+                  </div>
+                </div>
+                <div className="chooser-copy">
+                  <div className="chooser-eyebrow">Diary</div>
+                  <h3>Open Diary Book</h3>
+                  <p>
+                    Move into the diary book with the calendar, list, and edit pages.
+                  </p>
+                </div>
+              </button>
+            </div>
+          </div>
+        ),
+      },
+      {
         key: "public-index",
-        title: "AKASHIC INDEX",
-        subtitle: "Free shared database",
+        title: "SHARED AKASHIC INDEX",
+        subtitle: "notable people star charts",
         content: (
           <ProfileIndex
             entries={publicGroupedEntries}
             emptyMessage="No shared profiles are available yet."
             interactive
-            note="Shared index entries can be opened for details on the free plan."
             onSelect={(profile) => calculate({ includeAi: true, profileId: profile.id })}
           />
         ),
@@ -198,14 +327,14 @@ export default function BookDesign({ user }) {
           title: "MY AKASHIC INDEX",
           subtitle: "Your saved profiles",
           content: (
-            <ProfileIndex
-              entries={privateGroupedEntries}
-              emptyMessage="No saved profiles yet."
-              interactive
-              onSelect={(profile) => calculate({ includeAi: true, profileId: profile.id })}
-            />
-          ),
-        },
+              <ProfileIndex
+                entries={privateGroupedEntries}
+                emptyMessage="No saved profiles yet."
+                interactive
+                onSelect={openProfileForEdit}
+              />
+            ),
+          },
         {
           key: "form",
           title: "STAR TITLE",
@@ -264,10 +393,10 @@ export default function BookDesign({ user }) {
                 <button
                   className="secondary-btn"
                   type="button"
-                  onClick={() => calculate({ saveProfile: true })}
+                  onClick={saveProfile}
                   disabled={loading}
                 >
-                  Save
+                  {selectedProfile?.id ? "Update" : "Save"}
                 </button>
                 <button className="primary-btn" type="submit" disabled={loading}>
                   {loading ? "Opening..." : "Open"}
@@ -336,7 +465,11 @@ export default function BookDesign({ user }) {
     loading,
     privateGroupedEntries,
     publicGroupedEntries,
+    openProfileForEdit,
+    navigate,
     result,
+    saveProfile,
+    selectedProfile,
   ]);
 
   const pageCount = pages.length;
@@ -363,7 +496,7 @@ export default function BookDesign({ user }) {
               className="shooting-star"
               style={{
                 top: `${12 + i * 18}%`,
-                left: `${-20 + i * 4}%`,
+                left: `${12 + i * 22}%`,
                 animationDelay: `${i * 3.5}s`,
                 animationDuration: `${10 + i * 1.2}s`,
               }}
@@ -406,7 +539,7 @@ export default function BookDesign({ user }) {
             </div>
           </div>
 
-          <footer className="footer">・ゑｽｩ 2025 Horoscope App</footer>
+          <footer className="footer">@2025 Horoscope App</footer>
         </div>
       </div>
     </>
@@ -583,18 +716,22 @@ const sharedStyles = `
   @keyframes shooting {
     0% {
       opacity: 0;
-      transform: rotate(-26deg) translate3d(0, 0, 0);
+      transform: rotate(-18deg) translate3d(0, 0, 0);
     }
     10% {
       opacity: 1;
     }
     35% {
       opacity: 1;
-      transform: rotate(-26deg) translate3d(420px, 180px, 0);
+      transform: rotate(-18deg) translate3d(260px, 110px, 0);
+    }
+    70% {
+      opacity: 1;
+      transform: rotate(-18deg) translate3d(560px, 192px, 0);
     }
     100% {
       opacity: 0;
-      transform: rotate(-26deg) translate3d(720px, 310px, 0);
+      transform: rotate(-18deg) translate3d(840px, 168px, 0);
     }
   }
 
@@ -623,7 +760,7 @@ const sharedStyles = `
     width: min(760px, calc(100vw - 28px));
     height: calc(100vh - 80px);
     margin: 18px auto 24px;
-    padding-top: 4px;
+    padding-top: 0;
     display: flex;
     flex-direction: column;
     perspective: 1600px;
@@ -691,7 +828,7 @@ const sharedStyles = `
     position: absolute;
     inset: 0;
     padding: 36px 44px 88px 48px;
-    margin-left: 18px;
+    margin-left: 0;
     border-radius: 22px;
     background:
       radial-gradient(circle at top left, rgba(143, 168, 255, 0.10), transparent 26%),
@@ -761,7 +898,7 @@ const sharedStyles = `
     flex-direction: column;
     padding: 8px 10px 0;
     border-radius: 18px;
-    background: rgba(255,255,255,0.03);
+    background:    rgba(31, 34, 56, 0.78);
     backdrop-filter: blur(4px);
   }
 
@@ -824,16 +961,25 @@ const sharedStyles = `
     background: rgba(255, 255, 255, 0.04);
     color: #f5f7ff;
     cursor: pointer;
-    transition: transform 0.2s ease, background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+    transition:
+      transform 0.2s ease,
+      background 0.2s ease,
+      border-color 0.2s ease,
+      box-shadow 0.2s ease,
+      filter 0.2s ease;
     text-align: left;
     backdrop-filter: blur(3px);
   }
 
   .index-name-btn:hover {
     transform: translateY(-1px);
-    background: rgba(255,255,255,0.08);
-    border-color: rgba(190, 200, 255, 0.34);
-    box-shadow: 0 6px 18px rgba(60, 80, 170, 0.18);
+    background: rgba(255,255,255,0.1);
+    border-color: rgba(220, 228, 255, 0.42);
+    filter: brightness(1.08);
+    box-shadow:
+      0 8px 20px rgba(60, 80, 170, 0.18),
+      0 0 0 1px rgba(255,255,255,0.12) inset,
+      0 0 18px rgba(255,255,255,0.1);
   }
 
   .index-name-btn-static {
@@ -871,8 +1017,9 @@ const sharedStyles = `
 
   .guest-card {
     border-radius: 22px;
-    background: rgba(255,255,255,0.03);
-    border: 1px solid rgba(255,255,255,0.06);
+    background:ze: 12px;
+    color: rgba(215, 222, 255, 0.65);
+    border: none;
     padding: 8px 10px 0;
     height: 100%;
     display: flex;
@@ -936,6 +1083,180 @@ const sharedStyles = `
     text-decoration: none;
   }
 
+  .chooser-page {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 28px;
+    padding: 10px 4px 0;
+  }
+
+  .chooser-header {
+    max-width: 56rem;
+  }
+
+  .chooser-kicker {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 12px;
+    font-size: 12px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: rgba(220, 228, 255, 0.78);
+  }
+
+  .chooser-title {
+    margin: 0;
+    font-size: clamp(28px, 4vw, 44px);
+    line-height: 1.1;
+    color: #f7f8ff;
+  }
+
+  .chooser-text {
+    margin: 12px 0 0;
+    max-width: 44rem;
+    font-size: 15px;
+    line-height: 1.9;
+    color: rgba(220, 228, 255, 0.78);
+  }
+
+  .chooser-grid {
+    display: grid;
+    gap: 18px;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .chooser-card {
+    display: grid;
+    grid-template-columns: minmax(120px, 168px) minmax(0, 1fr);
+    align-items: center;
+    gap: 18px;
+    width: 100%;
+    text-align: left;
+    border-radius: 26px;
+    border: 1px solid rgba(255,255,255,0.18);
+    background: rgba(255,255,255,0.08);
+    padding: 18px;
+    color: #fff;
+    box-shadow: 0 16px 40px rgba(0,0,0,0.18);
+    cursor: pointer;
+    transition:
+      transform 0.2s ease,
+      background 0.2s ease,
+      border-color 0.2s ease,
+      box-shadow 0.2s ease,
+      filter 0.2s ease;
+  }
+
+  .chooser-card:hover {
+    transform: translateY(-2px);
+    border-color: rgba(255,255,255,0.2);
+    background: rgba(255,255,255,0.1);
+    filter: brightness(1.03);
+    box-shadow:
+      0 10px 22px rgba(127, 140, 255, 0.12),
+      0 18px 44px rgba(0,0,0,0.2),
+      0 0 0 1px rgba(255,255,255,0.08) inset,
+      0 0 26px rgba(255,255,255,0.08);
+  }
+
+  .chooser-media {
+    min-width: 0;
+  }
+
+  .chooser-media-frame {
+    position: relative;
+    aspect-ratio: 4 / 3;
+    width: 100%;
+    overflow: hidden;
+    border-radius: 20px;
+    border: 1px solid rgba(255,255,255,0.03);
+    background: transparent;
+    backdrop-filter: blur(14px);
+    box-shadow:
+      inset 0 0 0 1px rgba(255,255,255,0.04),
+      0 0 18px rgba(255,255,255,0.03);
+  }
+
+  .chooser-media-frame::before {
+    content: "";
+    position: absolute;
+    inset: 8px;
+    border-radius: 14px;
+    border: 1px solid rgba(255,255,255,0.05);
+    background: none;
+    box-shadow: 0 0 18px rgba(255,255,255,0.04);
+    filter: blur(1.5px);
+    opacity: 0.75;
+  }
+
+  .chooser-media-glow {
+    position: absolute;
+    inset: -16px;
+    border-radius: 28px;
+    background: radial-gradient(circle at center, rgba(255,255,255,0.035), transparent 68%);
+    filter: blur(22px);
+    opacity: 0.28;
+  }
+
+  .chooser-media-chart::before {
+    background:
+      linear-gradient(180deg, rgba(127,140,255,0.16), rgba(255,255,255,0.04)),
+      radial-gradient(circle at 35% 25%, rgba(175, 202, 255, 0.18), transparent 36%),
+      radial-gradient(circle at 70% 78%, rgba(196, 91, 214, 0.12), transparent 38%);
+  }
+
+  .chooser-media-diary::before {
+    background:
+      linear-gradient(180deg, rgba(255, 210, 230, 0.16), rgba(255,255,255,0.04)),
+      radial-gradient(circle at 30% 28%, rgba(255, 255, 255, 0.18), transparent 36%),
+      radial-gradient(circle at 72% 76%, rgba(116, 140, 255, 0.12), transparent 38%);
+  }
+
+  .chooser-copy {
+    min-width: 0;
+  }
+
+  .chooser-eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 0 12px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: rgba(240, 243, 255, 0.72);
+  }
+
+  .chooser-card h3 {
+    margin: 0;
+    font-size: 24px;
+    line-height: 1.2;
+    color: #ffffff;
+  }
+
+  .chooser-card p {
+    margin: 12px 0 0;
+    font-size: 14px;
+    line-height: 1.85;
+    color: rgba(226, 231, 255, 0.78);
+  }
+
+  @media (max-width: 840px) {
+    .chooser-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .chooser-card {
+      grid-template-columns: 1fr;
+      gap: 16px;
+      padding: 18px;
+    }
+  }
+
   .form-card {
     flex: 1;
     min-height: 0;
@@ -990,12 +1311,19 @@ const sharedStyles = `
     color: white;
     font-size: 16px;
     font-weight: 600;
-    transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+    transition:
+      transform 0.2s ease,
+      box-shadow 0.2s ease,
+      opacity 0.2s ease,
+      background 0.2s ease,
+      border-color 0.2s ease,
+      filter 0.2s ease;
   }
 
   .form-actions button:hover,
   .book-nav button:hover {
     transform: translateY(-1px);
+    filter: brightness(1.08);
   }
 
   .primary-btn {
@@ -1004,11 +1332,28 @@ const sharedStyles = `
     box-shadow: 0 6px 18px rgba(127, 140, 255, 0.28);
   }
 
+  .primary-btn:hover {
+    background: linear-gradient(135deg, #99a5ff, #c2cbff);
+    box-shadow:
+      0 10px 22px rgba(127, 140, 255, 0.24),
+      0 0 0 1px rgba(255,255,255,0.18) inset,
+      0 0 18px rgba(255,255,255,0.12);
+  }
+
   .secondary-btn {
     padding: 12px 20px;
     background: rgba(255,255,255,0.12);
     color: #f5f7ff;
     border: 1px solid rgba(255,255,255,0.08);
+  }
+
+  .secondary-btn:hover {
+    background: rgba(255,255,255,0.2);
+    border-color: rgba(255,255,255,0.22);
+    box-shadow:
+      0 10px 22px rgba(0,0,0,0.18),
+      0 0 0 1px rgba(255,255,255,0.12) inset,
+      0 0 18px rgba(255,255,255,0.12);
   }
 
   .reading-body {
@@ -1061,11 +1406,12 @@ const sharedStyles = `
 
   .book-nav {
     position: absolute;
-    left: 46px;
+    left: 44px;
     right: 10px;
     bottom: 24px;
     display: flex;
     justify-content: space-between;
+    gap: 12px;
     pointer-events: none;
     z-index: 10;
   }
@@ -1073,11 +1419,23 @@ const sharedStyles = `
   .book-nav button {
     pointer-events: auto;
     width: 52px;
-    height: 52px;
+    height: 46px;
+    padding: 0 18px;
     border-radius: 999px;
-    background: linear-gradient(135deg, #7f8cff, #97a8ff);
-    box-shadow: 0 8px 20px rgba(0,0,0,0.25);
+    border: 1px solid rgba(255,255,255,0.14);
+    background: rgba(255,255,255,0.08);
+    box-shadow: 0 10px 24px rgba(0,0,0,0.18);
+    color: #f5f7ff;
     font-size: 22px;
+  }
+
+  .book-nav button:hover {
+    background: rgba(255,255,255,0.18);
+    border-color: rgba(255,255,255,0.34);
+    box-shadow:
+      0 14px 28px rgba(0,0,0,0.22),
+      0 0 0 1px rgba(255,255,255,0.18) inset,
+      0 0 18px rgba(255,255,255,0.14);
   }
 
   .book-nav button:disabled {
@@ -1102,7 +1460,7 @@ const sharedStyles = `
 
     .page {
       padding: 26px 20px 88px 28px;
-      margin-left: 12px;
+      margin-left: 0;
     }
 
     .form-row {
@@ -1119,7 +1477,9 @@ const sharedStyles = `
     }
 
     .book-nav {
-      left: 26px;
+      left: 20px;
+      right: 10px;
+      bottom: 14px;
     }
 
     .chart-box img {
@@ -1127,4 +1487,3 @@ const sharedStyles = `
     }
   }
 `;
-

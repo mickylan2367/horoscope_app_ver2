@@ -76,8 +76,9 @@ export default function AboutPage() {
             </h1>
 
             <p className="mt-5 max-w-3xl text-base leading-8 text-slate-200">
-              This page is a short profile of who I am, how I work, and what I like.
-              I want the atmosphere to stay quiet, but the intent to stay clear.
+              If you have any questions or would like to get in touch, please e-mail me at <a href="mailto:mickylan2367@gmail.com" className="text-fuchsia-400 hover:underline">
+                mickylan2367@gmail.com
+              </a>
             </p>
 
             <div className="mt-10 grid items-center gap-6 rounded-[2rem] border border-white/10 bg-black/10 p-6 shadow-xl backdrop-blur-md md:grid-cols-[180px_1fr] md:p-8">
@@ -102,21 +103,14 @@ export default function AboutPage() {
                       I love anime and reading, and I am especially passionate about Western astrology.
                     </p>
                     <p className="mt-1 text-base leading-8 text-fuchsia-100/80">
-                      アニメと読書が好きで、特に西洋占星術に強く惹かれています。
+                      アニメと読書、そして特に西洋占星術が大好き。
                     </p>
                   </div>
 
                   <div>
                     <p>I am still learning tarot, so I have a long way to go.</p>
                     <p className="mt-1 text-base leading-8 text-fuchsia-100/80">
-                      タロットはまだ勉強中なので、これから学ぶことがたくさんあります。
-                    </p>
-                  </div>
-
-                  <div>
-                    <p>My strengths are astrology and English.</p>
-                    <p className="mt-1 text-base leading-8 text-fuchsia-100/80">
-                      強みは、占星術と英語です。
+                      タロットはまだ勉強中です。
                     </p>
                   </div>
 
@@ -126,7 +120,7 @@ export default function AboutPage() {
                       fascinating that they all try to understand the future in their own way.
                     </p>
                     <p className="mt-1 text-base leading-8 text-fuchsia-100/80">
-                      AI、科学、占星術は一見ちがうものに見えますが、それぞれの方法で未来を理解しようとしているところがとても面白いです。
+                      AI、科学、占星術は一見ちがうものに見えますが、それぞれの方法で未来を理解しようとしているところがとても面白いとおもい制作しました。
                     </p>
                   </div>
                 </div>
@@ -154,23 +148,6 @@ export default function AboutPage() {
               </div>
             </div>
 
-            <div className="mt-10 rounded-3xl border border-white/10 bg-black/10 p-6 shadow-xl backdrop-blur-md">
-              <p className="text-xs uppercase tracking-[0.28em] text-fuchsia-200/70">
-                Career
-              </p>
-              <div className="mt-3 space-y-3">
-                {career.map((item) => (
-                  <div key={item.year} className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                    <p className="text-xs uppercase tracking-[0.28em] text-fuchsia-200/70">
-                      {item.year}
-                    </p>
-                    <p className="mt-2 text-base leading-8 text-slate-200">{item.en}</p>
-                    <p className="mt-1 text-base leading-8 text-fuchsia-100/80">{item.ja}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-
             <div className="mt-10 rounded-[2rem] border border-white/10 bg-white/5 p-6 shadow-xl backdrop-blur-md">
               <div className="inline-flex items-center gap-2 text-sm tracking-[0.22em] uppercase text-fuchsia-200/80">
                 <span>Motto</span>
@@ -192,6 +169,23 @@ export default function AboutPage() {
                   <br />
                   その違いを見分ける知恵を、私にお与えください。
                 </p>
+              </div>
+            </div>
+
+            <div className="mt-10 rounded-3xl border border-white/10 bg-black/10 p-6 shadow-xl backdrop-blur-md">
+              <p className="text-xs uppercase tracking-[0.28em] text-fuchsia-200/70">
+                Career
+              </p>
+              <div className="mt-3 space-y-3">
+                {career.map((item) => (
+                  <div key={item.year} className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                    <p className="text-xs uppercase tracking-[0.28em] text-fuchsia-200/70">
+                      {item.year}
+                    </p>
+                    <p className="mt-2 text-base leading-8 text-slate-200">{item.en}</p>
+                    <p className="mt-1 text-base leading-8 text-fuchsia-100/80">{item.ja}</p>
+                  </div>
+                ))}
               </div>
             </div>
           </div>

@@ -24,7 +24,7 @@ export default function DailyWitchcraftsHome({ user }) {
 
           <div className="mt-10 grid gap-4 md:grid-cols-2">
             <Link
-              to="/diary"
+              to="/diary/list"
               className="group flex h-full flex-col rounded-[2rem] border border-white/14 bg-white/10 px-6 py-6 text-left text-white shadow-[0_16px_52px_rgba(0,0,0,0.14)] transition hover:-translate-y-1 hover:bg-white/14"
             >
               <div className="inline-flex items-center gap-2 text-sm font-semibold tracking-[0.18em] uppercase text-slate-100">

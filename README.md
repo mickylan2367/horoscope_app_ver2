@@ -1,5 +1,7 @@
 # LovelyWitch Life
 
+[![CI](https://github.com/mickylan2367/horoscope_app_ver2/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/mickylan2367/horoscope_app_ver2/actions/workflows/ci.yml)
+
 LovelyWitch Life is a personal astrology app built with a Django backend and a React frontend. It combines horoscope tools, diary notes, and a soft magical visual style into one private workspace, with a Codex-powered Slack agent layer that assigns roles like planner, frontend, backend, reviewer, and integrator for project work. The project is also organized with portfolio and job-search presentation in mind, so the structure and automation are meant to be easy to explain and review.
 
 

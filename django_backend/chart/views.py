@@ -549,6 +549,55 @@ def _get_accessible_profile(profile_id, user):
     raise PermissionDenied("You do not have access to this profile.")
 
 
+def _get_editable_profile(profile_id, user):
+    if not user.is_authenticated:
+        raise PermissionDenied("Login required to edit chart profiles.")
+
+    profile = HoroscopeProfile.objects.filter(pk=profile_id, user=user, is_public=False).first()
+    if profile is None:
+        raise PermissionDenied("You do not have access to edit this profile.")
+    return profile
+
+
+def _profile_fields_from_data(data, profile=None):
+    person_name = data.get("personName") or data.get("person_name") or (profile.person_name if profile else "")
+    place = data.get("place") or data.get("place_name") or (profile.place if profile else "")
+
+    birth_date_value = data.get("birthDate") or data.get("birth_date")
+    if birth_date_value:
+        birth_date = datetime.fromisoformat(birth_date_value).date()
+    elif profile is not None:
+        birth_date = profile.birth_date
+    else:
+        raise ValueError("Birth date is required")
+
+    birth_time_value = data.get("birthTime") or data.get("birth_time")
+    if birth_time_value:
+        birth_time = _parse_birth_time(birth_time_value)
+    elif profile is not None and profile.birth_time:
+        birth_time = profile.birth_time
+    else:
+        birth_time = dtime(12, 0)
+
+    lat = data.get("lat")
+    lon = data.get("lon")
+    if lat is None or lon is None:
+        if place:
+            lat, lon = get_lat_lon(place)
+        elif profile is not None:
+            lat = profile.lat
+            lon = profile.lon
+
+    return {
+        "person_name": person_name,
+        "place": place,
+        "birth_date": birth_date,
+        "birth_time": birth_time,
+        "lat": lat,
+        "lon": lon,
+    }
+
+
 def _result_owner_for_user(user):
     return user if user.is_authenticated else None
 
@@ -723,21 +772,49 @@ def api_chart_profile_create(request):
             return JsonResponse({"error": "Login required"}, status=401)
 
         data = json.loads(request.body)
-        birth_date = datetime.fromisoformat(data.get("birthDate") or data.get("birth_date")).date()
-        birth_time = _parse_birth_time(data.get("birthTime") or data.get("birth_time"))
+        profile_fields = _profile_fields_from_data(data)
         profile, created = HoroscopeProfile.objects.get_or_create(
             user=request.user,
-            person_name=data.get("personName") or data.get("person_name") or "",
-            birth_date=birth_date,
-            birth_time=birth_time,
+            person_name=profile_fields["person_name"],
+            birth_date=profile_fields["birth_date"],
+            birth_time=profile_fields["birth_time"],
             defaults={
-                "place": data.get("place") or "",
-                "lat": data.get("lat"),
-                "lon": data.get("lon"),
+                "place": profile_fields["place"],
+                "lat": profile_fields["lat"],
+                "lon": profile_fields["lon"],
                 "is_public": False,
             },
         )
         return JsonResponse(_profile_to_json(profile), status=201 if created else 200)
+    except PermissionDenied as exc:
+        return JsonResponse({"error": str(exc)}, status=403)
+    except Exception as exc:
+        return JsonResponse({"error": str(exc)}, status=400)
+
+
+@require_http_methods(["POST"])
+def api_chart_profile_update(request):
+    try:
+        if not request.user.is_authenticated:
+            return JsonResponse({"error": "Login required"}, status=401)
+
+        data = json.loads(request.body)
+        profile_id = data.get("profileId") or data.get("profile_id")
+        if not profile_id:
+            return JsonResponse({"error": "Profile ID required"}, status=400)
+
+        profile = _get_editable_profile(profile_id, request.user)
+        profile_fields = _profile_fields_from_data(data, profile)
+
+        profile.person_name = profile_fields["person_name"]
+        profile.place = profile_fields["place"]
+        profile.birth_date = profile_fields["birth_date"]
+        profile.birth_time = profile_fields["birth_time"]
+        profile.lat = profile_fields["lat"]
+        profile.lon = profile_fields["lon"]
+        profile.save()
+
+        return JsonResponse(_profile_to_json(profile))
     except PermissionDenied as exc:
         return JsonResponse({"error": str(exc)}, status=403)
     except Exception as exc:

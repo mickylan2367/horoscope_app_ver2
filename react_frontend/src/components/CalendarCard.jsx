@@ -14,6 +14,7 @@ export default function CalendarCard({
   const today = new Date();
   const year = displayDate.getFullYear();
   const month = displayDate.getMonth();
+  const monthLabel = `${year} / ${String(month + 1).padStart(2, "0")}`;
   const firstDay = new Date(year, month, 1).getDay();
   const lastDate = new Date(year, month + 1, 0).getDate();
   const diaryDateSet = new Set(diaryDates);
@@ -23,20 +24,17 @@ export default function CalendarCard({
   for (let day = 1; day <= lastDate; day += 1) cells.push(day);
 
   return (
-    <aside className="rounded-2xl bg-white p-5 shadow-sm">
-      <div className="mb-4 flex items-start justify-between gap-3">
+    <aside className="flex h-full w-full max-w-[640px] flex-col rounded-3xl bg-[#2a2f4d]/92 p-7 shadow-[0_12px_30px_rgba(0,0,0,0.16)] backdrop-blur-sm md:p-8">
+      <div className="mb-5 flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-lg font-bold text-[#5c3a3a]">Calendar</h2>
-          <p className="mt-1 text-sm text-[#8b6870]">
-            {year} / {String(month + 1).padStart(2, "0")}
-          </p>
+          <h2 className="text-xl font-bold tracking-[0.08em] text-[#f7f8ff]">{monthLabel}</h2>
         </div>
         <div className="flex gap-1">
           <button
             type="button"
             onClick={() => onChangeMonth?.(-1)}
             aria-label="Previous month"
-            className="flex h-8 w-8 items-center justify-center rounded-full border border-[#f1cbd3] text-[#5c3a3a] hover:bg-[#fff4f7]"
+            className="flex h-10 w-10 items-center justify-center rounded-full border border-white/12 text-[#f7f8ff] hover:bg-white/8"
           >
             <ChevronLeft className="h-4 w-4" />
           </button>
@@ -44,16 +42,16 @@ export default function CalendarCard({
             type="button"
             onClick={() => onChangeMonth?.(1)}
             aria-label="Next month"
-            className="flex h-8 w-8 items-center justify-center rounded-full border border-[#f1cbd3] text-[#5c3a3a] hover:bg-[#fff4f7]"
+            className="flex h-10 w-10 items-center justify-center rounded-full border border-white/12 text-[#f7f8ff] hover:bg-white/8"
           >
             <ChevronRight className="h-4 w-4" />
           </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-7 gap-2 text-center text-xs text-[#8b6870]">
+      <div className="grid flex-1 grid-cols-7 gap-3 text-center text-[1.05rem] text-slate-300 md:gap-4">
         {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((day) => (
-          <div key={day} className="py-2 font-semibold">
+          <div key={day} className="py-2 font-semibold tracking-[0.08em]">
             {day}
           </div>
         ))}
@@ -69,22 +67,22 @@ export default function CalendarCard({
           return (
             <button
               key={`${day}-${index}`}
-              type="button"
-              disabled={day === ""}
-              onClick={() => onSelectDate?.(dateKey)}
-              className={`flex h-9 w-9 items-center justify-center rounded-full text-sm ${
+            type="button"
+            disabled={day === ""}
+            onClick={() => onSelectDate?.(dateKey)}
+              className={`flex h-10 w-10 items-center justify-center rounded-full text-[1.05rem] transition md:h-12 md:w-12 ${
                 day === ""
                   ? "opacity-0"
-                  : isSelected
-                    ? "bg-[#5c3a3a] text-white"
+                : isSelected
+                  ? "bg-[#f4c2c2] text-[#2a2f4d]"
                     : hasDiary
-                      ? "bg-[#f8e1e7] font-semibold text-[#5c3a3a] hover:bg-[#f4c2c2]"
+                      ? "bg-white/10 font-semibold text-[#f7f8ff] hover:bg-white/14"
                   : isToday
-                    ? "calendar-today text-[#5c3a3a]"
-                    : "text-[#5c3a3a] hover:bg-[#fff4f7]"
+                    ? "calendar-today relative isolate overflow-hidden text-[#2a2f4d] font-bold"
+                    : "text-[#f7f8ff] hover:bg-white/8"
               }`}
             >
-              {day}
+              <span className="relative z-10">{day}</span>
             </button>
           );
         })}

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+﻿import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import * as FullpageModule from "@fullpage/react-fullpage";
 import { motion as Motion, AnimatePresence } from "framer-motion";
@@ -7,9 +7,10 @@ import {
   Star,
   Moon,
   Sparkles,
-  Compass,
   Wand2,
   MousePointer2,
+  LogIn,
+  UserPlus,
 } from "lucide-react";
 
 const ReactFullpage =
@@ -150,15 +151,6 @@ function CardDeck({ cards, theme, title, icon }) {
   const goNext = () =>
     setIndex((prev) => (prev + 1) % cards.length);
 
-  React.useEffect(() => {
-    const intervalMs = isTarot ? 10000 : 5000;
-    const timer = window.setInterval(() => {
-      setIndex((prev) => (prev + 1) % cards.length);
-    }, intervalMs);
-
-    return () => window.clearInterval(timer);
-  }, [cards.length, isTarot]);
-
   const handleKeyDown = (event) => {
     if (event.key === "ArrowLeft") {
       event.preventDefault();
@@ -171,14 +163,14 @@ function CardDeck({ cards, theme, title, icon }) {
   };
 
   return (
-    <div className="flex flex-col">
-      <div className="mb-4 flex items-center gap-2 text-xs uppercase tracking-[0.28em] text-slate-400">
+    <div className="mx-auto flex w-full max-w-[340px] flex-col">
+      <div className="mb-2 flex items-center justify-center gap-2 text-xs uppercase tracking-[0.28em] text-slate-400">
         <DeckIcon className={`h-4 w-4 ${styles.accent}`} />
         <span>{title}</span>
       </div>
 
       <div
-        className="group relative flex min-h-[480px] w-full items-center justify-center outline-none"
+        className="group relative flex min-h-[440px] w-full items-center justify-center outline-none"
         tabIndex={0}
         onKeyDown={handleKeyDown}
         aria-label={`${title} deck`}
@@ -291,7 +283,7 @@ function CardDeck({ cards, theme, title, icon }) {
 
 function SwipeCards() {
   return (
-    <div className="grid gap-10 lg:grid-cols-2 lg:items-start">
+    <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
       <CardDeck cards={experienceCards} theme="original" title="Original Tarot" icon={Moon} />
       <CardDeck cards={majorArcanaCards} theme="tarot" title="Major Arcana" icon={Sparkles} />
     </div>
@@ -305,6 +297,13 @@ export default function Home() {
     <div className="relative isolate bg-[#070b17] text-white">
       <CosmicBackground variant="hero" />
       <div className="relative z-10">
+        <header className="fixed inset-x-0 top-0 z-30 border-b border-white/10 bg-gradient-to-r from-[#1a1026]/18 via-[#2a1530]/14 to-[#1a1026]/18 backdrop-blur-2xl">
+          <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4 md:px-10">
+            <Link to="/" className="text-lg font-semibold tracking-[0.22em] text-white">
+              Daily Witchcrafts
+            </Link>
+          </div>
+        </header>
         <ReactFullpage
           licenseKey={"gplv3-license"}
           navigation={true}
@@ -322,11 +321,11 @@ export default function Home() {
               <ReactFullpage.Wrapper>
                 <section className="section relative isolate overflow-hidden">
 
-                  <div className="relative mx-auto flex min-h-screen max-w-6xl flex-col justify-center px-6 py-24 md:px-10">
+                  <div className="relative mx-auto flex min-h-screen max-w-6xl flex-col justify-center px-6 pb-24 pt-32 md:px-10 md:pt-36">
                     <div className="max-w-3xl">
                       <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-fuchsia-300/20 bg-white/5 px-4 py-2 text-sm text-fuchsia-100 backdrop-blur-md">
                         <Star className="h-4 w-4" />
-                        <span>AI × Witchcrafts</span>
+                        <span>WELCOME</span>
                     </div>
 
                     <h1 className="text-5xl font-semibold leading-tight text-white md:text-7xl md:leading-[1.1]">
@@ -341,18 +340,25 @@ export default function Home() {
 
                     <div className="mt-10 flex flex-wrap items-center gap-4">
                       <Link
-                        to="/home"
-                        className="inline-flex items-center gap-2 rounded-full bg-fuchsia-300 px-6 py-3 text-sm font-medium text-slate-950 transition hover:scale-[1.02]"
+                        to="/login"
+                        className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-7 py-3.5 text-base font-medium text-white transition hover:bg-white/15"
                       >
-                        <Compass className="h-4 w-4" />
-                        Travel
+                        <LogIn className="h-5 w-5" />
+                        LOGIN
+                      </Link>
+                      <Link
+                        to="/register"
+                        className="inline-flex items-center gap-2 rounded-full bg-fuchsia-300 px-7 py-3.5 text-base font-medium text-slate-950 transition hover:scale-[1.02]"
+                      >
+                        <UserPlus className="h-5 w-5" />
+                        NEW
                       </Link>
                       <button
                         type="button"
                         onClick={() => fullpageApi.moveTo("concept")}
-                        className="rounded-full border border-white/15 px-6 py-3 text-sm text-slate-200 transition hover:bg-white/5"
+                        className="rounded-full border border-white/15 px-7 py-3.5 text-base text-slate-200 transition hover:bg-white/5"
                       >
-                        Explore Concept
+                        CONCEPT
                       </button>
                     </div>
                   </div>
@@ -397,47 +403,47 @@ export default function Home() {
 
                 <section className="section">
                   <div className="mx-auto flex min-h-screen max-w-7xl flex-col justify-center px-6 py-24 md:px-10">
-                  <SectionTitle
-                    icon={<Moon className="h-4 w-4" />}
-                    eyebrow="Experience"
-                    title="Your Original Tarot"
-                    description="A custom reading flow built around your own symbols and story. 
+                    <SectionTitle
+                      icon={<Moon className="h-4 w-4" />}
+                      eyebrow="Experience"
+                      title="Your Original Tarot"
+                      description="A custom reading flow built around your own symbols and story. 
                     Click the left or right side of each card, or let it flip by itself."
-                  />
-                  <SwipeCards />
+                    />
+                    <SwipeCards />
                   </div>
                 </section>
 
                 <section className="section">
                   <div className="mx-auto flex min-h-screen max-w-7xl flex-col justify-center px-6 py-24 md:px-10">
-                  <SectionTitle
-                    icon={<Wand2 className="h-4 w-4" />}
-                    eyebrow="Author"
-                    title="MICKYLAN"
-                    description="I love anime and reading, and I’m especially interested in Western astrology."
-                  />
+                    <SectionTitle
+                      icon={<Wand2 className="h-4 w-4" />}
+                      eyebrow="Author"
+                      title="MICKYLAN"
+                      description="I love anime and reading, and I’m especially interested in Western astrology."
+                    />
 
-                  <div className="rounded-[2rem] border border-white/10 bg-white/5 p-6 shadow-xl backdrop-blur-md md:p-8">
-                    <div className="max-w-5xl">
-                      <h3 className="text-2xl font-semibold text-white">Disclaimer(免責事項)</h3>
-                      <p className="mt-4 text-sm leading-8 text-slate-300 md:text-base">
-                        This site is created for personal reflection and entertainment. It is not intended to replace professional advice, diagnosis, or treatment.The content on this site is meant for reflection and enjoyment only, and should not be considered professional advice.
+                    <div className="rounded-[2rem] border border-white/10 bg-white/5 p-6 shadow-xl backdrop-blur-md md:p-8">
+                      <div className="max-w-5xl">
+                        <h3 className="text-2xl font-semibold text-white">Disclaimer(免責事項)</h3>
+                        <p className="mt-4 text-sm leading-8 text-slate-300 md:text-base">
+                          This site is created for personal reflection and entertainment. It is not intended to replace professional advice, diagnosis, or treatment.The content on this site is meant for reflection and enjoyment only, and should not be considered professional advice.
 
-                        <br />
-                        <br />
-                        Astrology and tarot content on this site are provided for reflection and entertainment only, and are not a substitute for professional advice.
-                      </p>
+                          <br />
+                          <br />
+                          Astrology and tarot content on this site are provided for reflection and entertainment only, and are not a substitute for professional advice.
+                        </p>
 
-                      <div className="mt-6 flex flex-wrap gap-3">
-                        <Link
-                          to="/about"
-                          className="inline-flex items-center gap-2 rounded-full bg-fuchsia-300 px-4 py-2 text-sm font-medium text-slate-950 transition hover:scale-[1.02]"
-                        >
-                          AboutUs
-                        </Link>
+                        <div className="mt-6 flex flex-wrap gap-3">
+                          <Link
+                            to="/about"
+                            className="inline-flex items-center gap-2 rounded-full bg-fuchsia-300 px-4 py-2 text-sm font-medium text-slate-950 transition hover:scale-[1.02]"
+                          >
+                            AboutUs
+                          </Link>
+                        </div>
                       </div>
                     </div>
-                  </div>
                   </div>
                 </section>
               </ReactFullpage.Wrapper>

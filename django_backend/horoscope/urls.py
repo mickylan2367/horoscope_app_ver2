@@ -34,6 +34,7 @@ urlpatterns = [
     path("api/chart/profiles/", chart_views.api_chart_profiles, name="api_chart_profiles"),
     path("api/chart/calculate/", chart_views.api_chart_calculate, name="api_chart_calculate"),
     path("api/chart/profiles/create/", chart_views.api_chart_profile_create, name="api_chart_profile_create"),
+    path("api/chart/profiles/update/", chart_views.api_chart_profile_update, name="api_chart_profile_update"),
     path("diary/", include("diaryapp.urls")),
     path("accounts/", include("django.contrib.auth.urls")),
     path("app/", react_app, name="react_app"),

@@ -1,4 +1,3 @@
-import { FileText } from "lucide-react";
 import { useState } from "react";
 
 export default function DiaryCard({ diary, isActive = false, cardRef, onOpenEdit }) {
@@ -18,25 +17,21 @@ export default function DiaryCard({ diary, isActive = false, cardRef, onOpenEdit
           onOpenEdit?.(diary.id);
         }
       }}
-      className={`scroll-mt-6 rounded-2xl bg-white p-6 text-inherit shadow-sm transition hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#f4c2c2] ${
-          isActive ? "ring-2 ring-[#f4c2c2] ring-offset-4 ring-offset-[#fffafc]" : ""
-        }`}
+      className={`mb-6 scroll-mt-6 rounded-2xl border border-white/8 bg-[#31385d]/92 p-6 text-inherit shadow-[0_12px_30px_rgba(0,0,0,0.18)] backdrop-blur-sm transition hover:-translate-y-0.5 hover:bg-[#383f66]/95 hover:shadow-[0_16px_34px_rgba(0,0,0,0.22)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#f4c2c2] ${
+        isActive ? "ring-2 ring-[#f4c2c2] ring-offset-4 ring-offset-[#070b17]/40" : ""
+      }`}
       >
         <div className="mb-4 flex items-start justify-between gap-4">
           <div>
-            <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-[#f8e1e7] px-3 py-1 text-xs font-semibold tracking-[0.18em] text-[#5c3a3a] uppercase">
-              <FileText className="h-3.5 w-3.5" />
-              <span>Diary</span>
-            </div>
-            <h3 className="text-2xl font-bold text-[#5c3a3a]">{diary.date}</h3>
-            {diary.title && diary.title !== diary.date ? (
-              <p className="mt-2 text-sm text-[#8b6870]">{diary.title}</p>
+          <h3 className="text-2xl font-bold text-[#fbfcff]">{diary.date}</h3>
+          {diary.title && diary.title !== diary.date ? (
+              <p className="mt-2 text-sm text-slate-200">{diary.title}</p>
             ) : null}
           </div>
         </div>
 
         <div
-          className="diary-snippet max-w-none text-sm leading-7 text-[#5c3a3a]"
+          className="diary-snippet max-w-none text-sm leading-7 text-[#eef1ff]"
           dangerouslySetInnerHTML={{ __html: diary.renderedContent ?? diary.rendered_content ?? "" }}
         />
 
@@ -88,12 +83,12 @@ export default function DiaryCard({ diary, isActive = false, cardRef, onOpenEdit
               className="max-h-[75vh] w-full rounded-xl object-contain"
             />
             {selectedImage.caption ? (
-              <p className="mt-3 text-sm text-[#5c3a3a]">{selectedImage.caption}</p>
+              <p className="mt-3 text-sm text-[#2a2f4d]">{selectedImage.caption}</p>
             ) : null}
             <button
               type="button"
               onClick={() => setSelectedImage(null)}
-              className="mt-4 rounded-full bg-[#f4c2c2] px-5 py-2 text-sm font-semibold text-[#5c3a3a]"
+              className="mt-4 rounded-full bg-[#f4c2c2] px-5 py-2 text-sm font-semibold text-[#2a2f4d]"
             >
               Close
             </button>

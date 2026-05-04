@@ -19,6 +19,8 @@ export default function Layout({
   spellEffects = false,
   compactHeader = true,
   backgroundVariant = "base",
+  headerVariant = "pink",
+  hideAuthActions = false,
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -88,33 +90,55 @@ export default function Layout({
     };
   }, [spellEffects]);
 
+  const isCosmicHeader = headerVariant === "cosmic";
+  const headerClassName = isCosmicHeader
+    ? "sticky top-0 z-50 border-b border-white/10 bg-gradient-to-r from-[#1a1026]/18 via-[#2a1530]/14 to-[#1a1026]/18 shadow-sm backdrop-blur-2xl"
+    : "sticky top-0 z-50 border-b border-[#cfabc0] bg-gradient-to-r from-[#c98ca8] via-[#ddb0c0] to-[#dca5b6] shadow-sm";
+  const titleClassName = isCosmicHeader
+    ? `font-bold tracking-wide text-[#efe8ff] transition hover:text-white ${compactHeader ? "text-lg md:text-xl" : "text-xl"}`
+    : `font-bold tracking-wide text-[#4b3850] transition hover:text-[#7b5b70] ${compactHeader ? "text-lg md:text-xl" : "text-xl"}`;
+  const primaryButtonClassName = isCosmicHeader
+    ? `inline-flex items-center gap-2 rounded-full border border-white/18 bg-white/8 text-base text-[#f4eeff] transition hover:bg-white/14 ${
+        compactHeader ? "px-4 py-2" : "px-5 py-2.5"
+      }`
+    : `inline-flex items-center gap-2 rounded-full border border-[#d7a4bb] bg-white/72 text-base text-[#4b3850] transition hover:bg-white ${
+        compactHeader ? "px-4 py-2" : "px-5 py-2.5"
+      }`;
+  const accentButtonClassName = isCosmicHeader
+    ? `inline-flex items-center gap-2 rounded-full bg-white/88 text-base font-medium text-[#312040] transition hover:bg-white ${
+        compactHeader ? "px-4 py-2" : "px-5 py-2.5"
+      }`
+    : `inline-flex items-center gap-2 rounded-full bg-[#e7b2c5] text-base font-medium text-[#4b3850] transition hover:bg-[#d999b2] ${
+        compactHeader ? "px-4 py-2" : "px-5 py-2.5"
+      }`;
+  const menuClassName = isCosmicHeader
+    ? `border-t border-white/10 bg-[#171024] px-6 ${compactHeader ? "py-3" : "py-4"} md:hidden`
+    : `border-t border-[#d7a4bb] bg-[#f3e2eb] px-6 ${compactHeader ? "py-3" : "py-4"} md:hidden`;
+
   return (
     <div className="relative min-h-screen bg-[#070b17] text-[#eae5f6]">
       <CosmicBackground variant={backgroundVariant} />
-      <header className="sticky top-0 z-50 border-b border-[#cfabc0] bg-gradient-to-r from-[#c98ca8] via-[#ddb0c0] to-[#dca5b6] shadow-sm">
+      <header className={headerClassName}>
         <div
           className={`mx-auto flex max-w-6xl items-center justify-between px-6 ${
             compactHeader ? "py-3 md:px-8 md:py-3" : "py-4 md:px-10"
           }`}
         >
           <Link
-            to="/home"
-            className={`font-bold tracking-wide text-[#4b3850] transition hover:text-[#7b5b70] ${
-              compactHeader ? "text-lg md:text-xl" : "text-xl"
-            }`}
+            to="/"
+            className={titleClassName}
           >
             Daily Witchcrafts
           </Link>
 
-          <div className="hidden items-center gap-4 md:flex">
-            {user ? (
+          {!hideAuthActions && (
+            <div className="hidden items-center gap-4 md:flex">
+              {user ? (
               <div className="relative">
                 <button
                   type="button"
                   onClick={() => setProfileOpen((prev) => !prev)}
-                  className={`flex items-center gap-3 rounded-full border border-[#d7a4bb] bg-white/72 transition hover:bg-white ${
-                    compactHeader ? "px-2.5 py-1.5" : "px-3 py-2"
-                  }`}
+                  className={primaryButtonClassName}
                 >
                   {user.iconUrl ? (
                     <img
@@ -145,7 +169,7 @@ export default function Layout({
                       PROFILE
                     </Link>
                     <Link
-                      to="/diary"
+                      to="/diary/list"
                       className="flex items-center gap-3 px-4 py-3 text-sm text-[#4b3850] transition hover:bg-[#f8edf2]"
                       onClick={() => setProfileOpen(false)}
                     >
@@ -163,44 +187,43 @@ export default function Layout({
                   </div>
                 )}
               </div>
-            ) : (
+            ) : hideAuthActions ? null : (
               <>
-                <Link
-                  to="/login"
-                  className={`inline-flex items-center gap-2 rounded-full border border-[#d7a4bb] bg-white/72 text-sm text-[#4b3850] transition hover:bg-white ${
-                    compactHeader ? "px-3 py-1.5" : "px-4 py-2"
-                  }`}
-                >
-                  <LogIn className="h-4 w-4" />
-                  LOGIN
-                </Link>
-                <Link
-                  to="/register"
-                  className={`inline-flex items-center gap-2 rounded-full bg-[#e7b2c5] text-sm font-medium text-[#4b3850] transition hover:bg-[#d999b2] ${
-                    compactHeader ? "px-3 py-1.5" : "px-4 py-2"
-                  }`}
-                >
-                  <UserPlus className="h-4 w-4" />
-                  NEW
+              <Link
+                to="/login"
+                className={primaryButtonClassName}
+              >
+                <LogIn className="h-4 w-4" />
+                LOGIN
+              </Link>
+              <Link
+                to="/register"
+                className={accentButtonClassName}
+              >
+                <UserPlus className="h-4 w-4" />
+                NEW
                 </Link>
               </>
             )}
-          </div>
+            </div>
+          )}
 
-          <button
-            type="button"
-            className={compactHeader
-              ? "inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#d7a4bb] bg-white/72 md:hidden"
-              : "inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#d7a4bb] bg-white/72 md:hidden"}
-            onClick={() => setMenuOpen((prev) => !prev)}
-            aria-label="Open menu"
-          >
-            {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-          </button>
+          {!hideAuthActions && (
+            <button
+              type="button"
+              className={compactHeader
+                ? "inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#d7a4bb] bg-white/72 md:hidden"
+                : "inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#d7a4bb] bg-white/72 md:hidden"}
+              onClick={() => setMenuOpen((prev) => !prev)}
+              aria-label="Open menu"
+            >
+              {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </button>
+          )}
         </div>
 
-        {menuOpen && (
-          <div className={`border-t border-[#d7a4bb] bg-[#f3e2eb] px-6 ${compactHeader ? "py-3" : "py-4"} md:hidden`}>
+        {!hideAuthActions && menuOpen && (
+          <div className={menuClassName}>
             <div className="flex flex-col gap-3">
               {user ? (
                 <>
@@ -212,7 +235,7 @@ export default function Layout({
                     PROFILE
                   </Link>
                   <Link
-                    to="/diary"
+                    to="/diary/list"
                     className="rounded-xl border border-[#d7a4bb] bg-white/72 px-4 py-3 text-sm text-[#4b3850]"
                     onClick={() => setMenuOpen(false)}
                   >
@@ -226,7 +249,7 @@ export default function Layout({
                     LOGOUT
                   </button>
                 </>
-              ) : (
+              ) : hideAuthActions ? null : (
                 <>
                   <Link
                     to="/login"
