@@ -374,7 +374,7 @@ export default function Home() {
                     description="A quiet space where astrology, tarot, and daily notes meet."
                   />
 
-                  <div className="grid gap-5 md:grid-cols-3">
+                  <div className="mx-auto grid w-full max-w-5xl gap-5 md:grid-cols-3">
                     {[
                       {
                         title: "Diary",
