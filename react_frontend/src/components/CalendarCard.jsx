@@ -1,10 +1,11 @@
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { memo, useMemo } from "react";
+import { ChevronLeft, ChevronRight, Star } from "lucide-react";
 
 function formatDate(year, month, day) {
   return `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
-export default function CalendarCard({
+function CalendarCard({
   diaryDates = [],
   selectedDate = "",
   displayDate = new Date(),
@@ -15,78 +16,97 @@ export default function CalendarCard({
   const year = displayDate.getFullYear();
   const month = displayDate.getMonth();
   const monthLabel = `${year} / ${String(month + 1).padStart(2, "0")}`;
-  const firstDay = new Date(year, month, 1).getDay();
-  const lastDate = new Date(year, month + 1, 0).getDate();
-  const diaryDateSet = new Set(diaryDates);
-  const cells = [];
+  const diaryDateSet = useMemo(() => new Set(diaryDates), [diaryDates]);
+  const cells = useMemo(() => {
+    const firstDay = new Date(year, month, 1).getDay();
+    const lastDate = new Date(year, month + 1, 0).getDate();
+    const nextCells = [];
 
-  for (let index = 0; index < firstDay; index += 1) cells.push("");
-  for (let day = 1; day <= lastDate; day += 1) cells.push(day);
+    for (let index = 0; index < firstDay; index += 1) nextCells.push("");
+    for (let day = 1; day <= lastDate; day += 1) nextCells.push(day);
+    while (nextCells.length < 42) nextCells.push("");
+
+    return nextCells;
+  }, [month, year]);
 
   return (
-    <aside className="flex h-full w-full max-w-[640px] flex-col rounded-3xl bg-[#2a2f4d]/92 p-7 shadow-[0_12px_30px_rgba(0,0,0,0.16)] backdrop-blur-sm md:p-8">
-      <div className="mb-5 flex items-start justify-between gap-3">
-        <div>
-          <h2 className="text-xl font-bold tracking-[0.08em] text-[#f7f8ff]">{monthLabel}</h2>
+    <div className="flex h-full w-full max-w-[640px] flex-col">
+      <aside className="flex min-h-0 flex-1 flex-col rounded-3xl bg-[#2a2f4d]/92 p-5 pb-6 shadow-[0_12px_30px_rgba(0,0,0,0.16)] backdrop-blur-sm md:p-7 md:pb-7">
+        <div className="mb-4 flex shrink-0 items-start justify-center gap-3">
+          <div>
+            <h2 className="text-xl font-bold tracking-[0.08em] text-[#f7f8ff]">{monthLabel}</h2>
+          </div>
         </div>
-        <div className="flex gap-1">
+
+        <div className="grid min-h-0 flex-1 grid-cols-7 grid-rows-[auto_repeat(6,minmax(0,1fr))] gap-2 text-center text-[1rem] text-slate-300 md:gap-3 md:text-[1.05rem]">
+          {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((day) => (
+            <div key={day} className="flex min-h-6 items-center justify-center font-semibold tracking-[0.08em]">
+              {day}
+            </div>
+          ))}
+
+          {cells.map((day, index) => {
+            const isToday =
+              day === today.getDate() &&
+              month === today.getMonth() &&
+              year === today.getFullYear();
+            const dateKey = day === "" ? "" : formatDate(year, month, day);
+            const hasDiary = diaryDateSet.has(dateKey);
+            const isSelected = selectedDate === dateKey;
+            return (
+              <button
+                key={`${day}-${index}`}
+                type="button"
+                disabled={day === ""}
+                onClick={() => onSelectDate?.(dateKey)}
+                className={`relative isolate flex aspect-square h-full max-h-10 w-full max-w-10 items-center justify-center self-center justify-self-center rounded-full text-[1rem] transition md:max-h-11 md:max-w-11 md:text-[1.05rem] ${
+                  day === ""
+                    ? "opacity-0"
+                    : isSelected
+                      ? "bg-[#f4c2c2] text-[#2a2f4d]"
+                      : isToday
+                        ? "calendar-today overflow-hidden text-[#2a2f4d] font-bold"
+                        : hasDiary
+                          ? "font-semibold text-[#f7f8ff] hover:bg-white/8"
+                          : "text-[#f7f8ff] hover:bg-white/8"
+                }`}
+              >
+                {hasDiary && !isSelected ? (
+                  <Star
+                    className="absolute inset-1/2 -z-10 h-[82%] w-[82%] -translate-x-1/2 -translate-y-1/2 fill-white/10 text-white/24"
+                    strokeWidth={1.2}
+                    aria-hidden="true"
+                  />
+                ) : null}
+                <span className="relative z-10">{day}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="mt-3 flex shrink-0 items-center justify-between gap-3 px-2">
           <button
             type="button"
             onClick={() => onChangeMonth?.(-1)}
             aria-label="Previous month"
-            className="flex h-10 w-10 items-center justify-center rounded-full border border-white/12 text-[#f7f8ff] hover:bg-white/8"
+            className="group relative flex h-9 w-11 items-center justify-center rounded-full border border-white/18 bg-[linear-gradient(135deg,rgba(255,255,255,0.16),rgba(244,194,194,0.12),rgba(216,196,255,0.16))] text-[#f7f8ff] shadow-[0_8px_18px_rgba(0,0,0,0.16),0_0_14px_rgba(244,194,194,0.12)] transition hover:-translate-y-0.5 hover:border-white/34 hover:bg-white/18 hover:shadow-[0_12px_24px_rgba(0,0,0,0.2),0_0_20px_rgba(244,194,194,0.22)] md:h-10 md:w-12"
           >
-            <ChevronLeft className="h-4 w-4" />
+            <span className="absolute left-2 top-1.5 h-1.5 w-1.5 rounded-full bg-white/70 shadow-[0_0_8px_rgba(255,255,255,0.8)]" />
+            <ChevronLeft className="h-4 w-4 transition group-hover:-translate-x-0.5" />
           </button>
           <button
             type="button"
             onClick={() => onChangeMonth?.(1)}
             aria-label="Next month"
-            className="flex h-10 w-10 items-center justify-center rounded-full border border-white/12 text-[#f7f8ff] hover:bg-white/8"
+            className="group relative flex h-9 w-11 items-center justify-center rounded-full border border-white/18 bg-[linear-gradient(135deg,rgba(255,255,255,0.16),rgba(244,194,194,0.12),rgba(216,196,255,0.16))] text-[#f7f8ff] shadow-[0_8px_18px_rgba(0,0,0,0.16),0_0_14px_rgba(216,196,255,0.12)] transition hover:-translate-y-0.5 hover:border-white/34 hover:bg-white/18 hover:shadow-[0_12px_24px_rgba(0,0,0,0.2),0_0_20px_rgba(216,196,255,0.22)] md:h-10 md:w-12"
           >
-            <ChevronRight className="h-4 w-4" />
+            <span className="absolute right-2 top-1.5 h-1.5 w-1.5 rounded-full bg-white/70 shadow-[0_0_8px_rgba(255,255,255,0.8)]" />
+            <ChevronRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
           </button>
         </div>
-      </div>
-
-      <div className="grid flex-1 grid-cols-7 gap-3 text-center text-[1.05rem] text-slate-300 md:gap-4">
-        {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((day) => (
-          <div key={day} className="py-2 font-semibold tracking-[0.08em]">
-            {day}
-          </div>
-        ))}
-
-        {cells.map((day, index) => {
-          const isToday =
-            day === today.getDate() &&
-            month === today.getMonth() &&
-            year === today.getFullYear();
-          const dateKey = day === "" ? "" : formatDate(year, month, day);
-          const hasDiary = diaryDateSet.has(dateKey);
-          const isSelected = selectedDate === dateKey;
-          return (
-            <button
-              key={`${day}-${index}`}
-            type="button"
-            disabled={day === ""}
-            onClick={() => onSelectDate?.(dateKey)}
-              className={`flex h-10 w-10 items-center justify-center rounded-full text-[1.05rem] transition md:h-12 md:w-12 ${
-                day === ""
-                  ? "opacity-0"
-                : isSelected
-                  ? "bg-[#f4c2c2] text-[#2a2f4d]"
-                    : hasDiary
-                      ? "bg-white/10 font-semibold text-[#f7f8ff] hover:bg-white/14"
-                  : isToday
-                    ? "calendar-today relative isolate overflow-hidden text-[#2a2f4d] font-bold"
-                    : "text-[#f7f8ff] hover:bg-white/8"
-              }`}
-            >
-              <span className="relative z-10">{day}</span>
-            </button>
-          );
-        })}
-      </div>
-    </aside>
+      </aside>
+    </div>
   );
 }
+
+export default memo(CalendarCard);

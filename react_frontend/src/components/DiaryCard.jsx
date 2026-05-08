@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { memo, useMemo, useState } from "react";
 
-export default function DiaryCard({ diary, isActive = false, cardRef, onOpenEdit }) {
+function DiaryCard({ diary, isActive = false, cardRef, deferImages = false, onOpenEdit }) {
   const [selectedImage, setSelectedImage] = useState(null);
-  const visibleImages = diary.images?.slice(0, 3) ?? [];
+  const visibleImages = useMemo(() => diary.images?.slice(0, 3) ?? [], [diary.images]);
   const hiddenCount = Math.max((diary.images?.length ?? 0) - visibleImages.length, 0);
 
   return (
@@ -20,6 +20,10 @@ export default function DiaryCard({ diary, isActive = false, cardRef, onOpenEdit
       className={`mb-6 scroll-mt-6 rounded-2xl border border-white/8 bg-[#31385d]/92 p-6 text-inherit shadow-[0_12px_30px_rgba(0,0,0,0.18)] backdrop-blur-sm transition hover:-translate-y-0.5 hover:bg-[#383f66]/95 hover:shadow-[0_16px_34px_rgba(0,0,0,0.22)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#f4c2c2] ${
         isActive ? "ring-2 ring-[#f4c2c2] ring-offset-4 ring-offset-[#070b17]/40" : ""
       }`}
+      style={{
+        contentVisibility: "auto",
+        containIntrinsicSize: "420px",
+      }}
       >
         <div className="mb-4 flex items-start justify-between gap-4">
           <div>
@@ -35,7 +39,7 @@ export default function DiaryCard({ diary, isActive = false, cardRef, onOpenEdit
           dangerouslySetInnerHTML={{ __html: diary.renderedContent ?? diary.rendered_content ?? "" }}
         />
 
-        {visibleImages.length ? (
+        {!deferImages && visibleImages.length ? (
           <div className="mt-5 grid gap-3 sm:grid-cols-3">
             {visibleImages.map((image, index) => (
               <button
@@ -50,6 +54,10 @@ export default function DiaryCard({ diary, isActive = false, cardRef, onOpenEdit
                 <img
                   src={image.url}
                   alt={image.caption || "Diary"}
+                  loading="lazy"
+                  decoding="async"
+                  width="480"
+                  height="288"
                   className="h-36 w-full object-cover transition hover:scale-[1.02]"
                 />
                 {hiddenCount > 0 && index === visibleImages.length - 1 ? (
@@ -80,6 +88,7 @@ export default function DiaryCard({ diary, isActive = false, cardRef, onOpenEdit
             <img
               src={selectedImage.url}
               alt={selectedImage.caption || "Diary"}
+              decoding="async"
               className="max-h-[75vh] w-full rounded-xl object-contain"
             />
             {selectedImage.caption ? (
@@ -98,3 +107,5 @@ export default function DiaryCard({ diary, isActive = false, cardRef, onOpenEdit
     </article>
   );
 }
+
+export default memo(DiaryCard);

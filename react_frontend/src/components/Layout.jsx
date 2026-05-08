@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { BookOpen, LogIn, LogOut, Menu, User, UserPlus, X } from "lucide-react";
+import { BookOpen, LogIn, LogOut, Menu, Sparkles, User, UserPlus, X } from "lucide-react";
 import { apiFetch } from "../api";
 import CosmicBackground from "./CosmicBackground";
 
@@ -31,8 +31,7 @@ export default function Layout({
     await apiFetch("/api/auth/logout/", { method: "POST", body: "{}" });
     setProfileOpen(false);
     setMenuOpen(false);
-    navigate("/thank-you");
-    window.location.reload();
+    navigate("/diary/warp", { state: { target: "/thank-you", reloadAfter: true, warpMode: "collapse" } });
   };
 
   useEffect(() => {
@@ -176,6 +175,14 @@ export default function Layout({
                       <BookOpen className="h-4 w-4" />
                       RECORDS
                     </Link>
+                    <Link
+                      to="/tarot"
+                      className="flex items-center gap-3 px-4 py-3 text-sm text-[#4b3850] transition hover:bg-[#f8edf2]"
+                      onClick={() => setProfileOpen(false)}
+                    >
+                      <Sparkles className="h-4 w-4" />
+                      TAROT
+                    </Link>
                     <button
                       type="button"
                       className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-[#9d5f7e] transition hover:bg-[#f8edf2]"
@@ -240,6 +247,13 @@ export default function Layout({
                     onClick={() => setMenuOpen(false)}
                   >
                     RECORDS
+                  </Link>
+                  <Link
+                    to="/tarot"
+                    className="rounded-xl border border-[#d7a4bb] bg-white/72 px-4 py-3 text-sm text-[#4b3850]"
+                    onClick={() => setMenuOpen(false)}
+                  >
+                    TAROT
                   </Link>
                   <button
                     type="button"

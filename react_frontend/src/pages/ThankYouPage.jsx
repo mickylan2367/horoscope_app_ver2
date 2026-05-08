@@ -3,13 +3,26 @@ import Layout from "../components/Layout";
 
 export default function ThankYouPage() {
   return (
-    <Layout user={null}>
-      <section className="mx-auto max-w-xl rounded-2xl bg-white p-8 text-center shadow-sm">
-        <h1 className="text-3xl font-bold text-[#5c3a3a]">Thank you</h1>
-        <p className="mt-4 text-[#8b6870]">You have been logged out.</p>
-        <Link className="mt-6 inline-flex rounded-full bg-[#f4c2c2] px-6 py-3 font-semibold text-[#5c3a3a]" to="/login">
-          LOGIN
-        </Link>
+    <Layout user={null} backgroundVariant="cosmic" headerVariant="cosmic" hideAuthActions>
+      <section className="mx-auto flex min-h-[68vh] max-w-3xl items-center justify-center">
+        <div className="relative w-full overflow-hidden rounded-[2rem] border border-white/12 bg-white/8 px-8 py-12 text-center shadow-2xl backdrop-blur-xl md:px-14">
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(244,194,194,0.2),transparent_42%),radial-gradient(circle_at_18%_72%,rgba(216,196,255,0.14),transparent_32%)]" />
+          <div className="relative">
+            <p className="text-sm uppercase tracking-[0.32em] text-[#f4c2c2]">The spell is closed</p>
+            <h1 className="mt-4 text-4xl font-semibold text-white md:text-5xl">Thank you</h1>
+            <p className="mx-auto mt-5 max-w-xl text-sm leading-8 text-slate-200">
+              Your session has been gently sealed. When you return, the door will open again from a fresh login.
+            </p>
+            <div className="mt-8 flex flex-wrap justify-center gap-3">
+              <Link className="inline-flex cursor-pointer rounded-full bg-[#f4c2c2] px-6 py-3 font-semibold text-[#2a2036] transition hover:bg-[#ffd6df]" to="/login">
+                LOGIN
+              </Link>
+              <Link className="inline-flex cursor-pointer rounded-full border border-white/14 bg-white/8 px-6 py-3 font-semibold text-white transition hover:bg-white/14" to="/">
+                HOME
+              </Link>
+            </div>
+          </div>
+        </div>
       </section>
     </Layout>
   );

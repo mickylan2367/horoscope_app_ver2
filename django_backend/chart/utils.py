@@ -50,6 +50,8 @@ def _to_sign(d: float) -> LonResult:
 def heliocentric_longitudes(
     birth_dt_jst,  # naiveでもawareでもOK（JST想定）
     eph_path: str = "de421.bsp",
+    ts=None,
+    eph=None,
 ) -> Dict[str, LonResult]:
     """
     Returns heliocentric ecliptic longitudes for planets.
@@ -63,11 +65,13 @@ def heliocentric_longitudes(
     birth_dt_utc = birth_dt_jst.astimezone(pytz.utc)
 
     # 2) Skyfield Time
-    ts = load.timescale()
+    if ts is None:
+        ts = load.timescale()
     t = ts.from_datetime(birth_dt_utc)
 
     # 3) Ephemeris
-    eph = load(eph_path)
+    if eph is None:
+        eph = load(eph_path)
 
     sun = eph["sun"]
     planets = {
@@ -151,13 +155,10 @@ def calculate_planet_positions(t, location, planets421, planets440, ascendant):
         ascn_deg = int(asc_deg%30)+1
         zodiac_deg = int(lon_deg%30)+1
         delta = zodiac_deg - ascn_deg
-        print(delta)
 
         if (delta < 0) & (np.abs(delta) > (max_age-min_age)):
-            print('yes', np.abs(delta), max_age-min_age)
             return min_age + zodiac_deg
         elif delta < 0:
-            print('yes-2')
             return max_age + delta
         if delta > (max_age-min_age):
             return max_age - (30-zodiac_deg)

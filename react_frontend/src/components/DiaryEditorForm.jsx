@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { CalendarDays, ChevronDown, ChevronUp, Eye, ImagePlus, PenLine, Trash2 } from "lucide-react";
 import { apiFetch } from "../api";
@@ -69,11 +69,22 @@ export default function DiaryEditorForm({
     resizeTextarea();
   }, [content, mode, resizeTextarea]);
 
-  const imagePreviews = Array.from(images).map((file, index) => ({
-    key: `${file.name}-${file.lastModified}-${index}`,
-    name: file.name,
-    url: URL.createObjectURL(file),
-  }));
+  const imagePreviews = useMemo(
+    () =>
+      Array.from(images).map((file, index) => ({
+        key: `${file.name}-${file.lastModified}-${index}`,
+        name: file.name,
+        url: URL.createObjectURL(file),
+      })),
+    [images],
+  );
+
+  useEffect(
+    () => () => {
+      imagePreviews.forEach((image) => URL.revokeObjectURL(image.url));
+    },
+    [imagePreviews],
+  );
 
   const updateImageCaption = (imageId, caption) => {
     setExistingImages((current) =>
@@ -263,6 +274,8 @@ export default function DiaryEditorForm({
                 <img
                   src={image.url}
                   alt={image.caption || "Diary"}
+                  loading="lazy"
+                  decoding="async"
                   className="h-32 w-full rounded-2xl object-cover"
                 />
                 <input
@@ -306,6 +319,8 @@ export default function DiaryEditorForm({
                 <img
                   src={image.url}
                   alt={image.name}
+                  loading="lazy"
+                  decoding="async"
                   className="h-32 w-full rounded-2xl object-cover"
                 />
                 <p className="mt-2 truncate text-xs text-slate-300">{image.name}</p>

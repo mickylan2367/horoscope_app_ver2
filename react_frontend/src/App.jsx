@@ -12,6 +12,15 @@ import ChartWarpPage from "./pages/ChartWarpPage";
 import ChartPage from "./pages/ChartPage";
 import DiaryWarpPage from "./pages/DiaryWarpPage";
 import ThankYouPage from "./pages/ThankYouPage";
+import {
+  TarotCardEditorPage,
+  TarotDeckDetailPage,
+  TarotDeckListPage,
+  TarotHomePage,
+  TarotReadingDetailPage,
+  TarotReadingHistoryPage,
+  TarotReadingPage,
+} from "./pages/TarotPages";
 import { apiFetch } from "./api";
 
 function App() {
@@ -37,6 +46,14 @@ function App() {
         <Route path="/bookdesign" element={<BookDesign user={user} />} />
         <Route path="/chart/warp" element={<ChartWarpPage />} />
         <Route path="/chart" element={<ChartPage user={user} />} />
+        <Route path="/tarot" element={<TarotHomePage user={user} />} />
+        <Route path="/tarot/decks" element={<TarotDeckListPage user={user} />} />
+        <Route path="/tarot/decks/:deckId" element={<TarotDeckDetailPage user={user} />} />
+        <Route path="/tarot/decks/:deckId/cards/new" element={<TarotCardEditorPage user={user} />} />
+        <Route path="/tarot/cards/:cardId/edit" element={<TarotCardEditorPage user={user} />} />
+        <Route path="/tarot/read" element={<TarotReadingPage user={user} />} />
+        <Route path="/tarot/readings" element={<TarotReadingHistoryPage user={user} />} />
+        <Route path="/tarot/readings/:readingId" element={<TarotReadingDetailPage user={user} />} />
         <Route path="/diary/warp" element={<DiaryWarpPage />} />
         <Route path="/list" element={<Navigate to="/diary/list" replace />} />
         <Route

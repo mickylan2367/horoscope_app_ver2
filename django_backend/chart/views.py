@@ -1,6 +1,6 @@
 
 from django.shortcuts import render
-from .models import HoroscopeResult
+from .models import HoroscopeResult, TarotCard, TarotDeck, TarotReading, TarotReadingCard
 from .forms import HoroscopeForm
 from .utils import calculate_ascendant_skyfield, get_lat_lon, calculate_planet_positions, heliocentric_longitudes,make_cache_key
 from skyfield.api import load, Topos   # ここは今まで通りでOK
@@ -18,8 +18,10 @@ import json
 from pathlib import Path
 from collections import OrderedDict
 import re
-from django.db.models import Q
-from django.http import JsonResponse
+import random
+from django.db import transaction
+from django.db.models import Count, Q
+from django.http import JsonResponse, RawPostDataException
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
 
@@ -182,7 +184,7 @@ def build_helio_ai_payload(result_helio):
 
 
 def generate_ai_reading_geo(geo_payload):
-    cache_key = make_ai_cache_key("helio_reading", geo_payload)
+    cache_key = make_ai_cache_key("geo_reading", geo_payload)
     cached = cache.get(cache_key)
     if cached:
         return cached
@@ -214,7 +216,6 @@ def generate_ai_reading_geo(geo_payload):
         )
         text = response.output_text
         cache.set(cache_key, text, 60 * 60 * 24 * 30)  # 30日
-        print('データが作成されました')
         return text
     except Exception as e:
         return f"AI解釈の生成に失敗しました: {str(e)}"
@@ -261,6 +262,62 @@ def generate_ai_reading_helio(helio_payload):
     except Exception as e:
         return f"AI解釈の生成に失敗しました: {str(e)}"
     
+
+def build_tarot_ai_payload(reading):
+    return {
+        "question": reading.question,
+        "spreadType": reading.spread_type,
+        "deck": reading.deck.name if reading.deck else "",
+        "cards": [
+            {
+                "position": card.position_label,
+                "name": card.card_name_snapshot,
+                "orientation": "reversed" if card.is_reversed else "upright",
+                "meaning": card.meaning_snapshot,
+            }
+            for card in reading.cards.all()
+        ],
+    }
+
+
+def generate_ai_tarot_interpretation(tarot_payload):
+    cache_key = make_ai_cache_key("tarot_reading", tarot_payload)
+    cached = cache.get(cache_key)
+    if cached:
+        return cached
+
+    prompt = f"""
+あなたは、夜の小さな相談室にいる魔女のタロット読みです。
+相談者の悩みと引かれたカードをもとに、日本語で占いの解釈を書いてください。
+
+大切な姿勢:
+- 相談者のつらさや迷いには寄り添う。ただし、根拠なく「大丈夫」「必ず良くなる」とは言わない。
+- カードが停滞、拒絶、終わり、未練、危険、損失、関係の不均衡を示す場合は、やわらかくぼかしすぎず、はっきり告げる。
+- 怖がらせる断定や脅しは避ける。占いは決定ではなく、今見えている流れとして伝える。
+- 恋愛・仕事・人間関係の悩みに対して、相手の気持ちを断定しすぎず、相談者が次に取れる現実的な一歩を示す。
+- 医療、法律、金銭の重大判断は専門家への相談を促す。
+
+出力形式:
+1. まず2〜3文で、全体の流れを魔女らしい静かな語り口で伝える。
+2. 次に、カードごとの意味を短く読む。
+3. 最後に「今夜の助言」として、相談者が今日か明日にできる具体的な行動を1〜3個示す。
+
+長さは500〜900字程度。
+
+データ:
+{json.dumps(tarot_payload, ensure_ascii=False, indent=2)}
+""".strip()
+    try:
+        response = client.responses.create(
+            model="gpt-5.4",
+            input=prompt,
+        )
+        text = response.output_text
+        cache.set(cache_key, text, 60 * 60 * 24 * 30)
+        return text
+    except Exception as e:
+        return f"AI解釈の生成に失敗しました: {str(e)}"
+
 
 def make_ai_cache_key(prefix, payload):
     raw = json.dumps(payload, ensure_ascii=False, sort_keys=True)
@@ -365,7 +422,6 @@ def horoscope_view(request):
 
         saved = _get_result_queryset(request.user, cache_key).first()
         if saved:
-            print("DBから取得しました")
             data = saved.result_json
             result_geo = data.get("geo")
             result_helio = data.get("helio")
@@ -439,12 +495,10 @@ def horoscope_view(request):
 
         result_geo = attach_sabian_symbols_forGEO(planet_rows, sabian_dict)
 
-        helio_rows = heliocentric_longitudes(birth_datetime, eph_path="de421.bsp")
+        helio_rows = heliocentric_longitudes(birth_datetime, ts=TS, eph=PLANETS421)
         result_helio = attach_sabian_symbols_forHELIO(helio_rows, sabian_dict)
 
         aspects = detect_aspects(planet_rows)
-        for a in aspects:
-            print(f'{a["p1"]}-{a["p2"]}: {a["aspect"]} ({a["diff"]:.2f}°, orb {a["orb"]:.2f}°)')
 
         abs_path = os.path.join(settings.MEDIA_ROOT, 'horoscope/chart_geo_.png')
         draw_horoscope(result_geo, abs_path, asc=ascendant, aspects_found=aspects)
@@ -685,7 +739,7 @@ def _calculate_chart(data, user, include_ai=False, save_profile=False):
             ascendant=ascendant,
         )
         result_geo = attach_sabian_symbols_forGEO(planet_rows, sabian_dict)
-        helio_rows = heliocentric_longitudes(birth_datetime, eph_path="de421.bsp")
+        helio_rows = heliocentric_longitudes(birth_datetime, ts=TS, eph=PLANETS421)
         result_helio = attach_sabian_symbols_forHELIO(helio_rows, sabian_dict)
         aspects = detect_aspects(planet_rows)
         abs_path = os.path.join(settings.MEDIA_ROOT, "horoscope/chart_geo_.png")
@@ -819,3 +873,515 @@ def api_chart_profile_update(request):
         return JsonResponse({"error": str(exc)}, status=403)
     except Exception as exc:
         return JsonResponse({"error": str(exc)}, status=400)
+
+
+TAROT_DEFAULT_LIMIT = 50
+TAROT_SPREAD_LABELS = {
+    TarotReading.SPREAD_ONE_CARD: ["Message"],
+    TarotReading.SPREAD_THREE_CARD: ["Past", "Present", "Future"],
+}
+
+
+def _tarot_auth_error(request):
+    if request.user.is_authenticated:
+        return None
+    return JsonResponse({"error": "Login required"}, status=401)
+
+
+def get_tarot_reading_limit(user):
+    return TAROT_DEFAULT_LIMIT
+
+
+def _tarot_visible_decks(user):
+    if user.is_authenticated:
+        return TarotDeck.objects.filter(Q(is_system=True) | Q(user=user) | Q(is_public=True)).annotate(card_count=Count("cards"))
+    return TarotDeck.objects.filter(Q(is_system=True) | Q(is_public=True)).annotate(card_count=Count("cards"))
+
+
+def _tarot_editable_deck(deck_id, user):
+    if not user.is_authenticated:
+        raise PermissionDenied("Login required")
+    return TarotDeck.objects.get(pk=deck_id, user=user, is_system=False)
+
+
+def _tarot_visible_deck(deck_id, user):
+    return _tarot_visible_decks(user).get(pk=deck_id)
+
+
+def _card_image_value(card):
+    if card.image:
+        return card.image.url
+    return card.image_url
+
+
+def _tarot_deck_payload(deck):
+    return {
+        "id": deck.pk,
+        "name": deck.name,
+        "slug": deck.slug,
+        "description": deck.description,
+        "deckType": deck.deck_type,
+        "deck_type": deck.deck_type,
+        "isSystem": deck.is_system,
+        "is_system": deck.is_system,
+        "isPublic": deck.is_public,
+        "is_public": deck.is_public,
+        "ownerId": deck.user_id,
+        "owner_id": deck.user_id,
+        "ownerName": deck.user.username if deck.user_id and getattr(deck, "user", None) else "",
+        "owner_name": deck.user.username if deck.user_id and getattr(deck, "user", None) else "",
+        "allowReversed": deck.allow_reversed,
+        "allow_reversed": deck.allow_reversed,
+        "cardCount": getattr(deck, "card_count", deck.cards.count()),
+        "card_count": getattr(deck, "card_count", deck.cards.count()),
+    }
+
+
+def _tarot_card_payload(card, include_meanings=True):
+    payload = {
+        "id": card.pk,
+        "deckId": card.deck_id,
+        "deck_id": card.deck_id,
+        "name": card.name,
+        "arcana": card.arcana,
+        "suit": card.suit,
+        "number": card.number,
+        "keywords": card.keywords,
+        "image": _card_image_value(card),
+        "order": card.order,
+    }
+    if include_meanings:
+        payload.update(
+            {
+                "uprightMeaning": card.upright_meaning,
+                "upright_meaning": card.upright_meaning,
+                "reversedMeaning": card.reversed_meaning,
+                "reversed_meaning": card.reversed_meaning,
+            }
+        )
+    return payload
+
+
+def _tarot_reading_payload(reading, limit=None):
+    if limit is None:
+        limit = get_tarot_reading_limit(reading.user)
+    count = TarotReading.objects.filter(user=reading.user).count()
+    return {
+        "id": reading.pk,
+        "deck": _tarot_deck_payload(reading.deck) if reading.deck else None,
+        "deckId": reading.deck_id,
+        "deck_id": reading.deck_id,
+        "spreadType": reading.spread_type,
+        "spread_type": reading.spread_type,
+        "question": reading.question,
+        "aiInterpretation": reading.ai_interpretation,
+        "ai_interpretation": reading.ai_interpretation,
+        "memo": reading.memo,
+        "isPinned": reading.is_pinned,
+        "is_pinned": reading.is_pinned,
+        "createdAt": reading.created_at.isoformat(),
+        "created_at": reading.created_at.isoformat(),
+        "updatedAt": reading.updated_at.isoformat(),
+        "updated_at": reading.updated_at.isoformat(),
+        "limit": limit,
+        "remaining": max(limit - count, 0),
+        "cards": [
+            {
+                "id": reading_card.pk,
+                "position": reading_card.position,
+                "positionLabel": reading_card.position_label,
+                "position_label": reading_card.position_label,
+                "cardId": reading_card.card_id,
+                "card_id": reading_card.card_id,
+                "cardName": reading_card.card_name_snapshot,
+                "card_name": reading_card.card_name_snapshot,
+                "isReversed": reading_card.is_reversed,
+                "is_reversed": reading_card.is_reversed,
+                "meaning": reading_card.meaning_snapshot,
+                "image": reading_card.image_snapshot,
+            }
+            for reading_card in reading.cards.all()
+        ],
+    }
+
+
+def _json_body(request):
+    try:
+        return json.loads(request.body or "{}")
+    except RawPostDataException:
+        return request.POST
+    except json.JSONDecodeError:
+        raise ValueError("Invalid JSON")
+
+
+ALLOWED_TAROT_IMAGE_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp"}
+MAX_TAROT_IMAGE_SIZE = 5 * 1024 * 1024
+
+
+def _tarot_request_data(request):
+    content_type = (request.META.get("CONTENT_TYPE") or request.content_type or "").lower()
+    if content_type.startswith("multipart/form-data"):
+        return request.POST
+    return _json_body(request)
+
+
+def _tarot_image_error(image):
+    if not image:
+        return ""
+    if image.size > MAX_TAROT_IMAGE_SIZE:
+        return f"{image.name} is larger than 5MB."
+    if image.content_type not in ALLOWED_TAROT_IMAGE_CONTENT_TYPES:
+        return f"{image.name} must be JPEG, PNG, or WebP."
+    return ""
+
+
+def _trim_tarot_readings(user):
+    limit = get_tarot_reading_limit(user)
+    overflow = TarotReading.objects.filter(user=user).count() - limit
+    if overflow <= 0:
+        return
+
+    delete_ids = list(
+        TarotReading.objects.filter(user=user, is_pinned=False)
+        .order_by("created_at", "id")
+        .values_list("id", flat=True)[:overflow]
+    )
+    if len(delete_ids) < overflow:
+        raise ValueError("Pinned readings are at the limit. Unpin one before saving another.")
+    TarotReading.objects.filter(id__in=delete_ids).delete()
+
+
+def _tarot_spread_count(spread_type):
+    if spread_type == TarotReading.SPREAD_THREE_CARD:
+        return 3
+    if spread_type == TarotReading.SPREAD_ONE_CARD:
+        return 1
+    raise ValueError("Unsupported spread type")
+
+
+@require_http_methods(["GET", "POST"])
+def api_tarot_decks(request):
+    if request.method == "GET":
+        decks = _tarot_visible_decks(request.user).select_related("user")
+        return JsonResponse(
+            {
+                "systemDecks": [_tarot_deck_payload(deck) for deck in decks if deck.is_system],
+                "sharedDecks": [
+                    _tarot_deck_payload(deck)
+                    for deck in decks
+                    if deck.is_public and not deck.is_system and deck.user_id != getattr(request.user, "id", None)
+                ],
+                "myDecks": [
+                    _tarot_deck_payload(deck)
+                    for deck in decks
+                    if not deck.is_system and deck.user_id == getattr(request.user, "id", None)
+                ],
+            }
+        )
+
+    auth_error = _tarot_auth_error(request)
+    if auth_error:
+        return auth_error
+    try:
+        data = _json_body(request)
+    except ValueError as exc:
+        return JsonResponse({"error": str(exc)}, status=400)
+
+    name = str(data.get("name", "")).strip()
+    if not name:
+        return JsonResponse({"error": "name is required"}, status=400)
+
+    deck_type = data.get("deckType") or data.get("deck_type") or TarotDeck.DECK_TYPE_TAROT
+    if deck_type not in {TarotDeck.DECK_TYPE_TAROT, TarotDeck.DECK_TYPE_ORACLE}:
+        return JsonResponse({"error": "deckType must be tarot or oracle"}, status=400)
+
+    deck = TarotDeck.objects.create(
+        user=request.user,
+        name=name,
+        description=str(data.get("description", "")),
+        deck_type=deck_type,
+        is_public=bool(data.get("isPublic", data.get("is_public", False))),
+        allow_reversed=bool(data.get("allowReversed", data.get("allow_reversed", deck_type == TarotDeck.DECK_TYPE_TAROT))),
+    )
+    return JsonResponse(_tarot_deck_payload(deck), status=201)
+
+
+@require_http_methods(["GET", "PUT", "DELETE"])
+def api_tarot_deck_detail(request, pk):
+    try:
+        deck = _tarot_visible_deck(pk, request.user)
+    except TarotDeck.DoesNotExist:
+        return JsonResponse({"error": "Deck not found"}, status=404)
+
+    if request.method == "GET":
+        return JsonResponse(_tarot_deck_payload(deck))
+
+    if deck.is_system or deck.user_id != request.user.id:
+        return JsonResponse({"error": "This deck cannot be edited"}, status=403)
+
+    if request.method == "DELETE":
+        deck.delete()
+        return JsonResponse({"ok": True})
+
+    try:
+        data = _json_body(request)
+    except ValueError as exc:
+        return JsonResponse({"error": str(exc)}, status=400)
+
+    deck.name = str(data.get("name", deck.name)).strip() or deck.name
+    deck.description = str(data.get("description", deck.description))
+    deck_type = data.get("deckType") or data.get("deck_type") or deck.deck_type
+    if deck_type not in {TarotDeck.DECK_TYPE_TAROT, TarotDeck.DECK_TYPE_ORACLE}:
+        return JsonResponse({"error": "deckType must be tarot or oracle"}, status=400)
+    deck.deck_type = deck_type
+    deck.is_public = bool(data.get("isPublic", data.get("is_public", deck.is_public)))
+    deck.allow_reversed = bool(data.get("allowReversed", data.get("allow_reversed", deck.allow_reversed)))
+    deck.save()
+    return JsonResponse(_tarot_deck_payload(deck))
+
+
+@require_http_methods(["GET"])
+def api_tarot_deck_cards(request, pk):
+    try:
+        deck = _tarot_visible_deck(pk, request.user)
+    except TarotDeck.DoesNotExist:
+        return JsonResponse({"error": "Deck not found"}, status=404)
+    cards = deck.cards.all()
+    return JsonResponse(
+        {
+            "deck": _tarot_deck_payload(deck),
+            "cards": [_tarot_card_payload(card) for card in cards],
+        }
+    )
+
+
+@require_http_methods(["POST"])
+def api_tarot_card_create(request):
+    auth_error = _tarot_auth_error(request)
+    if auth_error:
+        return auth_error
+    try:
+        data = _tarot_request_data(request)
+        deck_id = data.get("deckId") or data.get("deck_id")
+        deck = _tarot_editable_deck(deck_id, request.user)
+    except (ValueError, TarotDeck.DoesNotExist, PermissionDenied) as exc:
+        return JsonResponse({"error": str(exc) or "Deck not found"}, status=400)
+
+    image_error = _tarot_image_error(request.FILES.get("imageFile"))
+    if image_error:
+        return JsonResponse({"error": image_error}, status=400)
+
+    card, error = _tarot_card_from_payload(data, deck, request.user)
+    if error:
+        return JsonResponse({"error": error}, status=400)
+    if request.FILES.get("imageFile"):
+        card.image = request.FILES["imageFile"]
+        card.image_url = ""
+    card.save()
+    return JsonResponse(_tarot_card_payload(card), status=201)
+
+
+def _tarot_card_from_payload(data, deck, user, card=None):
+    name = str(data.get("name", getattr(card, "name", ""))).strip()
+    arcana = data.get("arcana", getattr(card, "arcana", TarotCard.ARCANA_ORACLE))
+    suit = data.get("suit", getattr(card, "suit", TarotCard.SUIT_NONE)) or TarotCard.SUIT_NONE
+
+    if not name:
+        return None, "name is required"
+    if arcana not in {TarotCard.ARCANA_MAJOR, TarotCard.ARCANA_MINOR, TarotCard.ARCANA_ORACLE}:
+        return None, "arcana is invalid"
+    if arcana == TarotCard.ARCANA_MINOR and suit not in {
+        TarotCard.SUIT_CUPS,
+        TarotCard.SUIT_PENTACLES,
+        TarotCard.SUIT_SWORDS,
+        TarotCard.SUIT_WANDS,
+    }:
+        return None, "minor arcana cards require a suit"
+    if arcana != TarotCard.ARCANA_MINOR:
+        suit = TarotCard.SUIT_NONE
+
+    number = data.get("number", getattr(card, "number", None))
+    if number in {"", None}:
+        number = None
+    order = data.get("order", getattr(card, "order", 0))
+
+    card = card or TarotCard(deck=deck, user=user)
+    card.name = name
+    card.arcana = arcana
+    card.suit = suit
+    card.number = number
+    keywords = data.get("keywords", getattr(card, "keywords", [])) or []
+    if isinstance(keywords, str):
+        try:
+            parsed_keywords = json.loads(keywords)
+            keywords = parsed_keywords if isinstance(parsed_keywords, list) else keywords
+        except json.JSONDecodeError:
+            keywords = [keyword.strip() for keyword in keywords.split(",") if keyword.strip()]
+    card.keywords = keywords
+    card.upright_meaning = str(data.get("uprightMeaning", data.get("upright_meaning", getattr(card, "upright_meaning", "")))).strip()
+    card.reversed_meaning = str(data.get("reversedMeaning", data.get("reversed_meaning", getattr(card, "reversed_meaning", ""))))
+    card.image_url = str(data.get("image", data.get("imageUrl", getattr(card, "image_url", ""))) or "")
+    card.order = int(order or 0)
+
+    if not card.upright_meaning:
+        return None, "uprightMeaning is required"
+    return card, None
+
+
+@require_http_methods(["GET", "POST", "PUT", "DELETE"])
+def api_tarot_card_detail(request, pk):
+    try:
+        card = TarotCard.objects.select_related("deck").get(pk=pk)
+    except TarotCard.DoesNotExist:
+        return JsonResponse({"error": "Card not found"}, status=404)
+
+    visible = card.deck.is_system or (request.user.is_authenticated and card.deck.user_id == request.user.id)
+    if not visible:
+        return JsonResponse({"error": "Card not found"}, status=404)
+
+    if request.method == "GET":
+        return JsonResponse(_tarot_card_payload(card))
+
+    if card.deck.is_system or card.deck.user_id != request.user.id:
+        return JsonResponse({"error": "This card cannot be edited"}, status=403)
+
+    if request.method == "DELETE":
+        card.delete()
+        return JsonResponse({"ok": True})
+
+    try:
+        data = _tarot_request_data(request)
+    except ValueError as exc:
+        return JsonResponse({"error": str(exc)}, status=400)
+
+    image_error = _tarot_image_error(request.FILES.get("imageFile"))
+    if image_error:
+        return JsonResponse({"error": image_error}, status=400)
+
+    card, error = _tarot_card_from_payload(data, card.deck, request.user, card=card)
+    if error:
+        return JsonResponse({"error": error}, status=400)
+    if request.FILES.get("imageFile"):
+        card.image = request.FILES["imageFile"]
+        card.image_url = ""
+    card.save()
+    return JsonResponse(_tarot_card_payload(card))
+
+
+@require_http_methods(["POST"])
+def api_tarot_reading_draw(request):
+    auth_error = _tarot_auth_error(request)
+    if auth_error:
+        return auth_error
+    try:
+        data = _json_body(request)
+        deck_id = data.get("deckId") or data.get("deck_id")
+        deck = _tarot_visible_deck(deck_id, request.user) if deck_id else _tarot_visible_decks(request.user).filter(is_system=True).first()
+        if deck is None:
+            return JsonResponse({"error": "No tarot deck found. Run seed_default_tarot."}, status=400)
+        spread_type = data.get("spreadType") or data.get("spread_type") or TarotReading.SPREAD_ONE_CARD
+        card_count = _tarot_spread_count(spread_type)
+    except (ValueError, TarotDeck.DoesNotExist) as exc:
+        return JsonResponse({"error": str(exc) or "Deck not found"}, status=400)
+
+    cards = list(deck.cards.all())
+    if len(cards) < card_count:
+        return JsonResponse({"error": "Not enough cards in this deck"}, status=400)
+
+    limit = get_tarot_reading_limit(request.user)
+    current_count = TarotReading.objects.filter(user=request.user).count()
+    if current_count >= limit and not TarotReading.objects.filter(user=request.user, is_pinned=False).exists():
+        return JsonResponse({"error": "Pinned readings are at the limit. Unpin one before saving another."}, status=400)
+
+    allow_reversed = bool(data.get("allowReversed", data.get("allow_reversed", deck.allow_reversed))) and deck.allow_reversed
+    selected_cards = random.sample(cards, card_count)
+    labels = TAROT_SPREAD_LABELS[spread_type]
+
+    try:
+        with transaction.atomic():
+            reading = TarotReading.objects.create(
+                user=request.user,
+                deck=deck,
+                spread_type=spread_type,
+                question=str(data.get("question", "")),
+                ai_interpretation="",
+                memo=str(data.get("memo", "")),
+            )
+            for index, card in enumerate(selected_cards):
+                is_reversed = allow_reversed and random.choice([False, True])
+                meaning = card.reversed_meaning if is_reversed and card.reversed_meaning else card.upright_meaning
+                TarotReadingCard.objects.create(
+                    reading=reading,
+                    card=card,
+                    position=index + 1,
+                    position_label=labels[index],
+                    is_reversed=is_reversed,
+                    card_name_snapshot=card.name,
+                    meaning_snapshot=meaning,
+                    image_snapshot=_card_image_value(card),
+                )
+            _trim_tarot_readings(request.user)
+    except ValueError as exc:
+        return JsonResponse({"error": str(exc)}, status=400)
+
+    reading = TarotReading.objects.prefetch_related("cards").select_related("deck", "user").get(pk=reading.pk)
+    if data.get("includeAi") or data.get("include_ai"):
+        reading.ai_interpretation = generate_ai_tarot_interpretation(build_tarot_ai_payload(reading))
+        reading.save(update_fields=["ai_interpretation", "updated_at"])
+    return JsonResponse(_tarot_reading_payload(reading, limit=limit), status=201)
+
+
+@require_http_methods(["GET"])
+def api_tarot_readings(request):
+    auth_error = _tarot_auth_error(request)
+    if auth_error:
+        return auth_error
+    readings = (
+        TarotReading.objects.filter(user=request.user)
+        .select_related("deck", "user")
+        .prefetch_related("cards")[:100]
+    )
+    limit = get_tarot_reading_limit(request.user)
+    return JsonResponse(
+        {
+            "limit": limit,
+            "remaining": max(limit - TarotReading.objects.filter(user=request.user).count(), 0),
+            "readings": [_tarot_reading_payload(reading, limit=limit) for reading in readings],
+        }
+    )
+
+
+@require_http_methods(["GET", "PATCH", "DELETE"])
+def api_tarot_reading_detail(request, pk):
+    auth_error = _tarot_auth_error(request)
+    if auth_error:
+        return auth_error
+    try:
+        reading = (
+            TarotReading.objects.filter(user=request.user)
+            .select_related("deck", "user")
+            .prefetch_related("cards")
+            .get(pk=pk)
+        )
+    except TarotReading.DoesNotExist:
+        return JsonResponse({"error": "Reading not found"}, status=404)
+
+    if request.method == "GET":
+        return JsonResponse(_tarot_reading_payload(reading))
+
+    if request.method == "DELETE":
+        reading.delete()
+        return JsonResponse({"ok": True})
+
+    try:
+        data = _json_body(request)
+    except ValueError as exc:
+        return JsonResponse({"error": str(exc)}, status=400)
+    if "isPinned" in data or "is_pinned" in data:
+        reading.is_pinned = bool(data.get("isPinned", data.get("is_pinned")))
+    if "memo" in data:
+        reading.memo = str(data.get("memo", ""))
+    reading.save(update_fields=["is_pinned", "memo", "updated_at"])
+    _trim_tarot_readings(request.user)
+    reading = TarotReading.objects.select_related("deck", "user").prefetch_related("cards").get(pk=reading.pk)
+    return JsonResponse(_tarot_reading_payload(reading))

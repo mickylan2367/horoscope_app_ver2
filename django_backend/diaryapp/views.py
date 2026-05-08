@@ -15,6 +15,7 @@ from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.contrib.auth.models import User
+from django.db.models import Prefetch
 from django.utils import timezone
 from django.utils.dateparse import parse_date
 from pathlib import Path
@@ -237,6 +238,14 @@ MAX_DIARY_IMAGE_SIZE = 5 * 1024 * 1024
 ALLOWED_DIARY_IMAGE_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp"}
 
 
+def _diary_image_prefetch():
+    return Prefetch("images", queryset=DiaryImage.objects.order_by("order", "id"))
+
+
+def _diary_queryset():
+    return Diary.objects.prefetch_related(_diary_image_prefetch())
+
+
 def _validate_diary_images(files, existing_count=0):
     if existing_count + len(files) > MAX_DIARY_IMAGES:
         return f"Images are limited to {MAX_DIARY_IMAGES} per diary."
@@ -277,7 +286,7 @@ def _diary_payload(diary, include_rendered=True):
         "rendered_content": rendered_content,
         "images": [
             _diary_image_payload(image)
-            for image in diary.images.all().order_by("order", "id")
+            for image in diary.images.all()
         ],
     }
 
@@ -432,13 +441,10 @@ def api_markdown_preview(request):
 # @login_required
 @require_http_methods(["GET"])
 def api_diary_list(request):
-    print("login?", request.user.is_authenticated)
-    print("user:", request.user)
-    print("diary count:", Diary.objects.filter(user=request.user).count() if request.user.is_authenticated else "not login")
     if not request.user.is_authenticated:
         return JsonResponse([], safe=False, status=200)
 
-    diaries = Diary.objects.filter(user=request.user).prefetch_related("images").order_by("-date")
+    diaries = _diary_queryset().filter(user=request.user).order_by("-date")
     results = [_diary_payload(diary) for diary in diaries]
 
     return JsonResponse(results, safe=False)
@@ -483,7 +489,8 @@ def api_diary_create(request):
     for index, image in enumerate(files):
         DiaryImage.objects.create(diary=diary, image=image, order=index)
 
-    return JsonResponse(_diary_payload(diary), status=201)
+    refreshed = _diary_queryset().get(pk=diary.pk)
+    return JsonResponse(_diary_payload(refreshed), status=201)
 
 
 @require_http_methods(["GET", "POST"])
@@ -499,7 +506,7 @@ def api_diary_detail(request, pk):
         return auth_error
 
     diary = get_object_or_404(
-        Diary.objects.prefetch_related("images"),
+        _diary_queryset(),
         pk=pk,
         user=request.user
     )
@@ -526,7 +533,8 @@ def api_diary_detail(request, pk):
     if date is None:
         return JsonResponse({"error": "date must be YYYY-MM-DD"}, status=400)
 
-    image_error = _validate_diary_images(files, diary.images.count())
+    existing_count = diary.images.count()
+    image_error = _validate_diary_images(files, existing_count)
     if image_error:
         return JsonResponse({"error": image_error}, status=400)
 
@@ -535,11 +543,12 @@ def api_diary_detail(request, pk):
     diary.content = content
     diary.save()
 
-    start_order = diary.images.count()
+    start_order = existing_count
     for index, image in enumerate(files):
         DiaryImage.objects.create(diary=diary, image=image, order=start_order + index)
 
-    return JsonResponse(_diary_payload(diary))
+    refreshed = _diary_queryset().get(pk=diary.pk)
+    return JsonResponse(_diary_payload(refreshed))
 
 
 api_diary_edit = api_diary_detail
@@ -552,7 +561,7 @@ def api_diary_image_add(request, pk):
         return auth_error
 
     diary = get_object_or_404(
-        Diary.objects.prefetch_related("images"),
+        _diary_queryset(),
         pk=pk,
         user=request.user
     )
@@ -561,15 +570,16 @@ def api_diary_image_add(request, pk):
     if not files:
         return JsonResponse({"error": "No images selected."}, status=400)
 
-    image_error = _validate_diary_images(files, diary.images.count())
+    existing_count = diary.images.count()
+    image_error = _validate_diary_images(files, existing_count)
     if image_error:
         return JsonResponse({"error": image_error}, status=400)
 
-    start_order = diary.images.count()
+    start_order = existing_count
     for index, image in enumerate(files):
         DiaryImage.objects.create(diary=diary, image=image, order=start_order + index)
 
-    refreshed = Diary.objects.prefetch_related("images").get(pk=diary.pk)
+    refreshed = _diary_queryset().get(pk=diary.pk)
     return JsonResponse(_diary_payload(refreshed), status=201)
 
 
@@ -626,10 +636,13 @@ def api_diary_image_reorder(request, pk):
     if len(owned_images) != len(set(image_ids)):
         return JsonResponse({"error": "One or more images were not found."}, status=404)
 
+    images_to_update = []
     for index, image_id in enumerate(image_ids):
         image = owned_images[image_id]
         image.order = index
-        image.save(update_fields=["order"])
+        images_to_update.append(image)
 
-    refreshed = Diary.objects.prefetch_related("images").get(pk=diary.pk)
+    DiaryImage.objects.bulk_update(images_to_update, ["order"])
+
+    refreshed = _diary_queryset().get(pk=diary.pk)
     return JsonResponse(_diary_payload(refreshed))

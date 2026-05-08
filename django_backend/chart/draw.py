@@ -121,7 +121,6 @@ def draw_horoscope(planet_rows, filepath, asc, aspects_found):
     DRAW_ZODIAC_SIGNS = []
     for i in range(int(asc//30), int(asc//30+12)):
         DRAW_ZODIAC_SIGNS.append(ZODIAC_SIGNS[i%12])
-    print(DRAW_ZODIAC_SIGNS)
     ax.set_xticklabels(DRAW_ZODIAC_SIGNS, fontsize=15)
     
     theta = np.linspace(0, 2 * math.pi, 360)

@@ -213,6 +213,16 @@ export default function BookDesign({ user }) {
     [form, isAuthenticated, refreshProfiles],
   );
 
+  const closeAndLogout = useCallback(async () => {
+    if (isAuthenticated) {
+      await apiFetch("/api/auth/logout/", { method: "POST", body: "{}" });
+      navigate("/diary/warp", { state: { target: "/thank-you", reloadAfter: true, warpMode: "collapse" } });
+      return;
+    }
+
+    navigate("/diary/warp", { state: { target: "/" } });
+  }, [isAuthenticated, navigate]);
+
   const pages = useMemo(() => {
     const items = [
       {
@@ -246,13 +256,13 @@ export default function BookDesign({ user }) {
               When you sign in, your own records appear, along with saved horoscopes and new readings that continue your journey through the stars.
             </p>
             <div className="guest-actions">
-              <Link
+              <button
+                type="button"
                 className="guest-button"
-                to="/chart/warp"
-                state={{ source: "close-book", target: "/" }}
+                onClick={closeAndLogout}
               >
-                CLOSE
-              </Link>
+                CLOSE & LOGOUT
+              </button>
             </div>
           </div>
         ),
@@ -272,6 +282,13 @@ export default function BookDesign({ user }) {
                 <div className="chooser-media" aria-hidden="true">
                   <div className="chooser-media-frame chooser-media-chart">
                     <div className="chooser-media-glow" />
+                    <div className="chooser-illustration chart-illustration">
+                      <span className="chart-orbit chart-orbit-outer" />
+                      <span className="chart-orbit chart-orbit-inner" />
+                      <span className="chart-dot chart-dot-one" />
+                      <span className="chart-dot chart-dot-two" />
+                      <span className="chart-dot chart-dot-three" />
+                    </div>
                   </div>
                 </div>
                 <div className="chooser-copy">
@@ -291,6 +308,13 @@ export default function BookDesign({ user }) {
                 <div className="chooser-media" aria-hidden="true">
                   <div className="chooser-media-frame chooser-media-diary">
                     <div className="chooser-media-glow" />
+                    <div className="chooser-illustration diary-illustration">
+                      <span className="diary-book" />
+                      <span className="diary-ribbon" />
+                      <span className="diary-line diary-line-one" />
+                      <span className="diary-line diary-line-two" />
+                      <span className="diary-heart" />
+                    </div>
                   </div>
                 </div>
                 <div className="chooser-copy">
@@ -298,6 +322,32 @@ export default function BookDesign({ user }) {
                   <h3>Open Diary Book</h3>
                   <p>
                     Move into the diary book with the calendar, list, and edit pages.
+                  </p>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                className="chooser-card"
+                onClick={() => navigate("/tarot")}
+              >
+                <div className="chooser-media" aria-hidden="true">
+                  <div className="chooser-media-frame chooser-media-tarot">
+                    <div className="chooser-media-glow" />
+                    <div className="chooser-illustration tarot-illustration">
+                      <span className="tarot-card tarot-card-back" />
+                      <span className="tarot-card tarot-card-front" />
+                      <span className="tarot-moon" />
+                      <span className="tarot-star tarot-star-one" />
+                      <span className="tarot-star tarot-star-two" />
+                    </div>
+                  </div>
+                </div>
+                <div className="chooser-copy">
+                  <div className="chooser-eyebrow">Tarot</div>
+                  <h3>Open Tarot Room</h3>
+                  <p>
+                    Enter the tarot app to draw cards, browse decks, and keep saved readings.
                   </p>
                 </div>
               </button>
@@ -457,6 +507,7 @@ export default function BookDesign({ user }) {
     return items;
   }, [
     calculate,
+    closeAndLogout,
     form.birthDate,
     form.birthTime,
     form.personName,
@@ -664,11 +715,12 @@ const sharedStyles = `
     border-radius: 999px;
     background: white;
     animation: twinkle ease-in-out infinite;
+    will-change: opacity, transform;
   }
 
   .shooting-star {
     position: absolute;
-    width: 150px;
+    width: 128px;
     height: 2px;
     border-radius: 999px;
     background: linear-gradient(
@@ -679,11 +731,11 @@ const sharedStyles = `
     );
     opacity: 0;
     transform: rotate(-26deg);
-    filter:
-      drop-shadow(0 0 6px rgba(255,255,255,0.95))
-      drop-shadow(0 0 16px rgba(197, 225, 255, 0.65))
-      drop-shadow(0 0 26px rgba(184, 128, 255, 0.40));
+    box-shadow:
+      0 0 8px rgba(255,255,255,0.72),
+      0 0 18px rgba(197, 225, 255, 0.34);
     animation: shooting ease-in-out infinite;
+    will-change: opacity, transform;
   }
 
   .shooting-star::after {
@@ -697,9 +749,8 @@ const sharedStyles = `
     background: white;
     transform: translateY(-50%);
     box-shadow:
-      0 0 10px rgba(255,255,255,1),
-      0 0 20px rgba(255,255,255,0.75),
-      0 0 34px rgba(115, 206, 255, 0.55);
+      0 0 10px rgba(255,255,255,0.92),
+      0 0 20px rgba(115, 206, 255, 0.36);
   }
 
   @keyframes twinkle {
@@ -732,6 +783,17 @@ const sharedStyles = `
     100% {
       opacity: 0;
       transform: rotate(-18deg) translate3d(840px, 168px, 0);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .star,
+    .shooting-star {
+      animation: none;
+    }
+
+    .shooting-star {
+      display: none;
     }
   }
 
@@ -1081,6 +1143,7 @@ const sharedStyles = `
     color: white;
     font-weight: 600;
     text-decoration: none;
+    cursor: pointer;
   }
 
   .chooser-page {
@@ -1213,6 +1276,239 @@ const sharedStyles = `
       linear-gradient(180deg, rgba(255, 210, 230, 0.16), rgba(255,255,255,0.04)),
       radial-gradient(circle at 30% 28%, rgba(255, 255, 255, 0.18), transparent 36%),
       radial-gradient(circle at 72% 76%, rgba(116, 140, 255, 0.12), transparent 38%);
+  }
+
+  .chooser-media-tarot::before {
+    background:
+      linear-gradient(180deg, rgba(244, 194, 194, 0.18), rgba(255,255,255,0.04)),
+      radial-gradient(circle at 38% 26%, rgba(255, 232, 176, 0.18), transparent 36%),
+      radial-gradient(circle at 70% 78%, rgba(174, 120, 255, 0.14), transparent 38%);
+  }
+
+  .chooser-illustration {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+  }
+
+  .chooser-illustration span {
+    position: absolute;
+    display: block;
+  }
+
+  .chart-orbit {
+    left: 50%;
+    top: 50%;
+    border-radius: 999px;
+    border: 1px solid rgba(244, 247, 255, 0.56);
+    transform: translate(-50%, -50%);
+    box-shadow: 0 0 16px rgba(169, 190, 255, 0.18);
+  }
+
+  .chart-orbit-outer {
+    width: 68%;
+    aspect-ratio: 1;
+  }
+
+  .chart-orbit-inner {
+    width: 38%;
+    aspect-ratio: 1;
+    border-color: rgba(244, 194, 194, 0.54);
+  }
+
+  .chart-illustration::before,
+  .chart-illustration::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 62%;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.54), transparent);
+    transform: translate(-50%, -50%) rotate(28deg);
+  }
+
+  .chart-illustration::after {
+    transform: translate(-50%, -50%) rotate(118deg);
+  }
+
+  .chart-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 999px;
+    background: #fff6d6;
+    box-shadow: 0 0 14px rgba(255, 239, 175, 0.62);
+  }
+
+  .chart-dot-one {
+    left: 28%;
+    top: 27%;
+  }
+
+  .chart-dot-two {
+    right: 24%;
+    top: 39%;
+    width: 8px;
+    height: 8px;
+    background: #dce7ff;
+  }
+
+  .chart-dot-three {
+    left: 46%;
+    bottom: 22%;
+    width: 7px;
+    height: 7px;
+    background: #ffd6e8;
+  }
+
+  .diary-book {
+    left: 24%;
+    top: 19%;
+    width: 50%;
+    height: 64%;
+    border-radius: 12px 16px 16px 12px;
+    border: 1px solid rgba(255,255,255,0.62);
+    background:
+      linear-gradient(90deg, rgba(255,255,255,0.16) 0 14%, transparent 14%),
+      linear-gradient(145deg, rgba(255, 202, 224, 0.64), rgba(156, 179, 255, 0.26));
+    box-shadow:
+      0 16px 28px rgba(0,0,0,0.16),
+      inset 0 0 18px rgba(255,255,255,0.18);
+  }
+
+  .diary-ribbon {
+    left: 33%;
+    top: 18%;
+    width: 8px;
+    height: 58%;
+    border-radius: 999px;
+    background: linear-gradient(180deg, #fff0a8, #f4a9c6);
+    box-shadow: 0 0 14px rgba(255, 226, 150, 0.4);
+  }
+
+  .diary-line {
+    left: 44%;
+    width: 22%;
+    height: 2px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.58);
+  }
+
+  .diary-line-one {
+    top: 42%;
+  }
+
+  .diary-line-two {
+    top: 53%;
+    width: 16%;
+  }
+
+  .diary-heart {
+    right: 21%;
+    bottom: 23%;
+    width: 14px;
+    height: 14px;
+    border-radius: 8px 8px 2px 8px;
+    background: #ffd1df;
+    transform: rotate(45deg);
+    box-shadow: 0 0 14px rgba(255, 193, 214, 0.5);
+  }
+
+  .diary-heart::before,
+  .diary-heart::after {
+    content: "";
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    border-radius: 999px;
+    background: inherit;
+  }
+
+  .diary-heart::before {
+    left: -7px;
+    top: 0;
+  }
+
+  .diary-heart::after {
+    left: 0;
+    top: -7px;
+  }
+
+  .tarot-card {
+    width: 38%;
+    height: 66%;
+    border-radius: 13px;
+    border: 1px solid rgba(255,255,255,0.62);
+    box-shadow:
+      0 18px 30px rgba(0,0,0,0.18),
+      inset 0 0 18px rgba(255,255,255,0.14);
+  }
+
+  .tarot-card-back {
+    left: 24%;
+    top: 20%;
+    background: linear-gradient(150deg, rgba(166, 137, 255, 0.46), rgba(255, 212, 156, 0.2));
+    transform: rotate(-10deg);
+  }
+
+  .tarot-card-front {
+    right: 24%;
+    top: 16%;
+    background:
+      radial-gradient(circle at 50% 36%, rgba(255, 239, 183, 0.44), transparent 22%),
+      linear-gradient(150deg, rgba(46, 38, 76, 0.86), rgba(244, 194, 194, 0.3));
+    transform: rotate(8deg);
+  }
+
+  .tarot-card-front::before {
+    content: "";
+    position: absolute;
+    inset: 10px;
+    border-radius: 9px;
+    border: 1px solid rgba(255,255,255,0.28);
+  }
+
+  .tarot-moon {
+    right: 33%;
+    top: 28%;
+    width: 22px;
+    height: 22px;
+    border-radius: 999px;
+    background: #ffe9a8;
+    box-shadow: 0 0 18px rgba(255, 232, 168, 0.52);
+  }
+
+  .tarot-moon::after {
+    content: "";
+    position: absolute;
+    left: 8px;
+    top: -2px;
+    width: 22px;
+    height: 22px;
+    border-radius: 999px;
+    background: rgba(55, 42, 82, 0.92);
+  }
+
+  .tarot-star {
+    width: 8px;
+    height: 8px;
+    background: #ffffff;
+    clip-path: polygon(50% 0, 61% 36%, 100% 50%, 61% 64%, 50% 100%, 39% 64%, 0 50%, 39% 36%);
+    box-shadow: 0 0 12px rgba(255,255,255,0.65);
+  }
+
+  .tarot-star-one {
+    right: 30%;
+    bottom: 25%;
+  }
+
+  .tarot-star-two {
+    right: 44%;
+    bottom: 35%;
+    width: 6px;
+    height: 6px;
+    opacity: 0.78;
   }
 
   .chooser-copy {

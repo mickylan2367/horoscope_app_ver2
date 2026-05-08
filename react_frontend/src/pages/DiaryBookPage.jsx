@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion as Motion } from "framer-motion";
 import { ArrowLeft, ArrowRight, Save } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -12,6 +12,9 @@ const seededRandom = (seed) => {
   const x = Math.sin(seed) * 10000;
   return x - Math.floor(x);
 };
+
+const DIARY_PAGE_SIZE = 12;
+const DIARY_IMAGE_REVEAL_DELAY_MS = 220;
 
 export default function DiaryBookPage({
   authReady = true,
@@ -37,9 +40,12 @@ export default function DiaryBookPage({
     if (forceEditor || diaryId || isEdit) return 2;
     return initialPageIndex;
   });
+  const [visibleDiaryCount, setVisibleDiaryCount] = useState(DIARY_PAGE_SIZE);
+  const [listImagesReady, setListImagesReady] = useState(false);
   const [pageTransition, setPageTransition] = useState(null);
   const [editorTransition, setEditorTransition] = useState(null);
   const listScrollRef = useRef(null);
+  const selectedDiaryRef = useRef(null);
   const editorTransitionTimerRef = useRef(null);
 
   const starStyles = useMemo(
@@ -69,11 +75,6 @@ export default function DiaryBookPage({
   }, []);
 
   useEffect(() => {
-    if (pageIndex !== 1 || !listScrollRef.current) return;
-    listScrollRef.current.scrollTo({ top: 0, behavior: "auto" });
-  }, [pageIndex, selectedDate]);
-
-  useEffect(() => {
     if (!pageTransition || pageIndex !== pageTransition.targetPageIndex) return undefined;
 
     const timeoutId = window.setTimeout(() => {
@@ -100,101 +101,184 @@ export default function DiaryBookPage({
     };
   }, [editorTransition, navigate, pageIndex, selectedDate]);
 
+  useEffect(() => {
+    if (pageIndex !== 1 || loading || error) return undefined;
+
+    const timeoutId = window.setTimeout(() => {
+      setListImagesReady(true);
+    }, DIARY_IMAGE_REVEAL_DELAY_MS);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [error, loading, pageIndex]);
+
   const diaryDates = useMemo(
     () => [...new Set(diaries.map((diary) => diary.date).filter(Boolean))],
     [diaries],
   );
 
   const sortedDiaries = useMemo(() => {
-    if (!selectedDate) return diaries;
-    const selected = diaries.filter((diary) => diary.date === selectedDate);
-    const remaining = diaries.filter((diary) => diary.date !== selectedDate);
-    return [...selected, ...remaining];
-  }, [diaries, selectedDate]);
+    return diaries;
+  }, [diaries]);
+  const scrollTargetDiaryIndex = useMemo(() => {
+    if (!selectedDate) return -1;
+    const exactIndex = sortedDiaries.findIndex((diary) => diary.date === selectedDate);
+    if (exactIndex >= 0) return exactIndex;
+
+    const olderOrSameIndex = sortedDiaries.findIndex((diary) => diary.date && diary.date <= selectedDate);
+    if (olderOrSameIndex >= 0) return olderOrSameIndex;
+
+    return sortedDiaries.length > 0 ? sortedDiaries.length - 1 : -1;
+  }, [selectedDate, sortedDiaries]);
+  const visibleDiaryLimit = useMemo(() => {
+    if (scrollTargetDiaryIndex < 0) return visibleDiaryCount;
+    return Math.max(visibleDiaryCount, scrollTargetDiaryIndex + DIARY_PAGE_SIZE);
+  }, [scrollTargetDiaryIndex, visibleDiaryCount]);
+  const visibleDiaries = useMemo(
+    () => sortedDiaries.slice(0, visibleDiaryLimit),
+    [sortedDiaries, visibleDiaryLimit],
+  );
+  const hasMoreDiaries = visibleDiaryLimit < sortedDiaries.length;
+
+  const scrollToSelectedDiary = useCallback(() => {
+    const container = listScrollRef.current;
+    const selectedCard = selectedDiaryRef.current;
+    if (!container || !selectedCard) return false;
+
+    const targetTop = container.scrollTop + selectedCard.getBoundingClientRect().top - container.getBoundingClientRect().top;
+    container.scrollTo({
+      top: targetTop,
+      behavior: "auto",
+    });
+    return true;
+  }, []);
+
+  useLayoutEffect(() => {
+    if (pageIndex !== 1 || scrollTargetDiaryIndex < 0) return;
+    scrollToSelectedDiary();
+  }, [pageIndex, scrollTargetDiaryIndex, scrollToSelectedDiary, visibleDiaryLimit]);
+
+  useEffect(() => {
+    if (pageIndex !== 1 || scrollTargetDiaryIndex < 0 || loading || error) return undefined;
+
+    let frameId = 0;
+    const timeoutIds = [];
+    const scheduleScroll = (delay) => {
+      const timeoutId = window.setTimeout(() => {
+        frameId = window.requestAnimationFrame(() => {
+          scrollToSelectedDiary();
+        });
+      }, delay);
+      timeoutIds.push(timeoutId);
+    };
+
+    scheduleScroll(0);
+    scheduleScroll(listImagesReady ? 240 : 520);
+
+    return () => {
+      timeoutIds.forEach((timeoutId) => window.clearTimeout(timeoutId));
+      if (frameId) {
+        window.cancelAnimationFrame(frameId);
+      }
+    };
+  }, [error, listImagesReady, loading, pageIndex, scrollTargetDiaryIndex, scrollToSelectedDiary, visibleDiaryLimit]);
 
   const activeEditorDiaryId = editorTransition?.diaryId ?? diaryId;
   const selectedDiary = diaries.find((diary) => String(diary.id) === String(activeEditorDiaryId));
   const editorTitle = isEdit ? "Edit Diary" : "Add Your Journal";
   const editorFormId = "diary-editor-form";
 
-  const goToBookIntro = () => {
-    navigate("/chart/warp", {
+  const goToBookIntro = useCallback(() => {
+    navigate("/diary/warp", {
       state: {
-        source: "diary",
         target: "/bookdesign",
         targetState: { page: 1 },
       },
     });
-  };
+  }, [navigate]);
 
-  const handleBackToList = () => {
+  const handleBackToList = useCallback(() => {
+    setListImagesReady(false);
     setPageTransition({
       route: "/diary/list",
       targetPageIndex: 1,
       state: selectedDate ? { selectedDate } : undefined,
     });
     setPageIndex(1);
-  };
+  }, [selectedDate]);
 
-  const handleBackToCalendar = () => {
+  const handleBackToCalendar = useCallback(() => {
     setPageTransition({
       route: "/diary",
       targetPageIndex: 0,
       state: undefined,
     });
     setPageIndex(0);
-  };
+  }, []);
 
-  const goToNextPage = () => {
+  const goToNextPage = useCallback(() => {
+    setListImagesReady(false);
     setPageTransition({
       route: "/diary/list",
       targetPageIndex: 1,
       state: selectedDate ? { selectedDate } : undefined,
     });
     setPageIndex(1);
-  };
+  }, [selectedDate]);
 
-  const goToEditor = (targetRoute, targetDiaryId = null) => {
+  const goToEditor = useCallback((targetRoute, targetDiaryId = null) => {
     if (editorTransitionTimerRef.current) {
       window.clearTimeout(editorTransitionTimerRef.current);
       editorTransitionTimerRef.current = null;
     }
     setEditorTransition({ route: targetRoute, diaryId: targetDiaryId });
     setPageIndex(2);
-  };
+  }, []);
 
-  const handleSelectDate = (date) => {
+  const handleSelectDate = useCallback((date) => {
     setNotice("");
     setSelectedDate(date);
+    setListImagesReady(false);
+    const exactIndex = diaries.findIndex((diary) => diary.date === date);
+    const targetIndex =
+      exactIndex >= 0
+        ? exactIndex
+        : diaries.findIndex((diary) => diary.date && diary.date <= date);
+    setVisibleDiaryCount(targetIndex >= 0 ? Math.max(DIARY_PAGE_SIZE, targetIndex + DIARY_PAGE_SIZE) : DIARY_PAGE_SIZE);
     setPageTransition({
       route: "/diary/list",
       targetPageIndex: 1,
       state: { selectedDate: date },
     });
     setPageIndex(1);
-  };
+  }, [diaries]);
 
-  const handleChangeMonth = (offset) => {
+  const handleChangeMonth = useCallback((offset) => {
     setNotice("");
     setCalendarDate((current) => {
       const next = new Date(current);
       next.setMonth(current.getMonth() + offset, 1);
       return next;
     });
-  };
+  }, []);
 
-  const handleSaved = (savedDiary) => {
+  const handleSaved = useCallback((savedDiary) => {
     const nextDate = savedDiary?.date || selectedDate || "";
     if (nextDate) {
       navigate("/diary/list", { state: { selectedDate: nextDate } });
       return;
     }
     navigate("/diary/list");
-  };
+  }, [navigate, selectedDate]);
 
-  const handleCardOpen = (targetDiaryId) => {
+  const handleCardOpen = useCallback((targetDiaryId) => {
     goToEditor(`/diary/${targetDiaryId}/edit`, targetDiaryId);
-  };
+  }, [goToEditor]);
+
+  const showMoreDiaries = useCallback(() => {
+    setVisibleDiaryCount((current) => Math.max(current, visibleDiaryLimit) + DIARY_PAGE_SIZE);
+  }, [visibleDiaryLimit]);
 
   return (
     <div className="relative isolate min-h-screen overflow-hidden bg-[#070b17] text-white">
@@ -284,7 +368,7 @@ export default function DiaryBookPage({
                         <p className="reading-subtitle">Diary / Entries</p>
                         <p className="diary-page-caption">
                           {selectedDate
-                            ? `Showing the selected day first: ${selectedDate}`
+                            ? `Jumped back to: ${selectedDate}`
                           : "Browse your archive and open any card to edit it."}
                         </p>
                       </div>
@@ -298,16 +382,28 @@ export default function DiaryBookPage({
                         {error ? <p className="diary-error">{error}</p> : null}
                         {notice ? <p className="diary-notice">{notice}</p> : null}
 
-                        {!loading && !error && sortedDiaries.length > 0
-                          ? sortedDiaries.map((diary) => (
+                        {!loading && !error && visibleDiaries.length > 0
+                          ? visibleDiaries.map((diary) => (
                               <DiaryCard
                                 key={diary.id}
                                 diary={diary}
                                 isActive={selectedDate === diary.date}
+                                cardRef={
+                                  diary.id === sortedDiaries[scrollTargetDiaryIndex]?.id
+                                    ? selectedDiaryRef
+                                    : undefined
+                                }
+                                deferImages={!listImagesReady}
                                 onOpenEdit={handleCardOpen}
                               />
                             ))
                           : null}
+
+                        {!loading && !error && hasMoreDiaries ? (
+                          <button type="button" className="diary-more-button" onClick={showMoreDiaries}>
+                            MORE
+                          </button>
+                        ) : null}
 
                         {!loading && !error && sortedDiaries.length === 0 ? (
                           <div className="diary-empty">
@@ -441,11 +537,12 @@ export default function DiaryBookPage({
           border-radius: 999px;
           background: white;
           animation: twinkle ease-in-out infinite;
+          will-change: opacity, transform;
         }
 
         .shooting-star {
           position: absolute;
-          width: 150px;
+          width: 128px;
           height: 2px;
           border-radius: 999px;
           background: linear-gradient(
@@ -456,11 +553,11 @@ export default function DiaryBookPage({
           );
           opacity: 0;
           transform: rotate(-26deg);
-          filter:
-            drop-shadow(0 0 6px rgba(255,255,255,0.95))
-            drop-shadow(0 0 16px rgba(197, 225, 255, 0.65))
-            drop-shadow(0 0 26px rgba(184, 128, 255, 0.40));
+          box-shadow:
+            0 0 8px rgba(255,255,255,0.72),
+            0 0 18px rgba(197, 225, 255, 0.34);
           animation: shooting ease-in-out infinite;
+          will-change: opacity, transform;
         }
 
         .shooting-star::after {
@@ -474,9 +571,8 @@ export default function DiaryBookPage({
           background: white;
           transform: translateY(-50%);
           box-shadow:
-            0 0 10px rgba(255,255,255,1),
-            0 0 20px rgba(255,255,255,0.75),
-            0 0 34px rgba(115, 206, 255, 0.55);
+            0 0 10px rgba(255,255,255,0.92),
+            0 0 20px rgba(115, 206, 255, 0.36);
         }
 
         @keyframes twinkle {
@@ -505,6 +601,17 @@ export default function DiaryBookPage({
           100% {
             opacity: 0;
             transform: rotate(-26deg) translate3d(720px, 310px, 0);
+          }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .star,
+          .shooting-star {
+            animation: none;
+          }
+
+          .shooting-star {
+            display: none;
           }
         }
 
@@ -743,6 +850,34 @@ export default function DiaryBookPage({
         .diary-empty {
           text-align: center;
           padding: 22px 16px;
+        }
+
+        .diary-more-button {
+          display: flex;
+          width: min(220px, 100%);
+          height: 44px;
+          align-items: center;
+          justify-content: center;
+          margin: 4px auto 20px;
+          border-radius: 999px;
+          border: 1px solid rgba(255,255,255,0.14);
+          background: rgba(255,255,255,0.1);
+          color: #f5f7ff;
+          font-weight: 700;
+          letter-spacing: 0.12em;
+          cursor: pointer;
+          transition:
+            transform 180ms ease,
+            background-color 180ms ease,
+            box-shadow 180ms ease;
+        }
+
+        .diary-more-button:hover {
+          transform: translateY(-1px);
+          background: rgba(255,255,255,0.18);
+          box-shadow:
+            0 14px 28px rgba(0,0,0,0.18),
+            0 0 0 1px rgba(255,255,255,0.14) inset;
         }
 
         .diary-page-footer {
