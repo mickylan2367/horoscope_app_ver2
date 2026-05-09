@@ -34,16 +34,16 @@ function CalendarCard({
 
   return (
     <div className="flex h-full w-full max-w-[640px] flex-col">
-      <aside className="flex min-h-0 flex-1 flex-col rounded-3xl bg-[#2a2f4d]/92 p-5 pb-6 shadow-[0_12px_30px_rgba(0,0,0,0.16)] backdrop-blur-sm md:p-7 md:pb-7">
-        <div className="mb-4 flex shrink-0 items-start justify-center gap-3">
+      <aside className="flex min-h-0 flex-1 flex-col rounded-3xl bg-[#2a2f4d]/92 p-3 pb-4 shadow-[0_12px_30px_rgba(0,0,0,0.16)] backdrop-blur-sm sm:p-5 sm:pb-6 md:p-7 md:pb-7">
+        <div className="mb-2 flex shrink-0 items-start justify-center gap-3 sm:mb-4">
           <div>
-            <h2 className="text-xl font-bold tracking-[0.08em] text-[#f7f8ff]">{monthLabel}</h2>
+            <h2 className="text-lg font-bold tracking-[0.08em] text-[#f7f8ff] sm:text-xl">{monthLabel}</h2>
           </div>
         </div>
 
-        <div className="grid min-h-0 flex-1 grid-cols-7 grid-rows-[auto_repeat(6,minmax(0,1fr))] gap-2 text-center text-[1rem] text-slate-300 md:gap-3 md:text-[1.05rem]">
+        <div className="grid min-h-0 flex-1 grid-cols-7 grid-rows-[auto_repeat(6,minmax(0,1fr))] gap-1 text-center text-[0.86rem] text-slate-300 sm:gap-2 sm:text-[1rem] md:gap-3 md:text-[1.05rem]">
           {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((day) => (
-            <div key={day} className="flex min-h-6 items-center justify-center font-semibold tracking-[0.08em]">
+            <div key={day} className="flex min-h-5 items-center justify-center font-semibold tracking-[0.08em] sm:min-h-6">
               {day}
             </div>
           ))}
@@ -64,7 +64,7 @@ function CalendarCard({
                 type="button"
                 disabled={day === ""}
                 onClick={() => onSelectDate?.(dateKey)}
-                className={`relative isolate flex aspect-square h-full max-h-10 w-full max-w-10 items-center justify-center self-center justify-self-center rounded-full text-[1rem] transition md:max-h-11 md:max-w-11 md:text-[1.05rem] ${
+                className={`relative isolate flex aspect-square h-full max-h-8 w-full max-w-8 items-center justify-center self-center justify-self-center rounded-full text-[0.86rem] transition sm:max-h-10 sm:max-w-10 sm:text-[1rem] md:max-h-11 md:max-w-11 md:text-[1.05rem] ${
                   day === ""
                     ? "opacity-0"
                     : isSelected
@@ -97,7 +97,7 @@ function CalendarCard({
           })}
         </div>
 
-        <div className="mt-3 flex shrink-0 items-center justify-between gap-3 px-2">
+        <div className="mt-2 flex shrink-0 items-center justify-between gap-3 px-1 sm:mt-3 sm:px-2">
           <button
             type="button"
             onClick={() => onChangeMonth?.(-1)}

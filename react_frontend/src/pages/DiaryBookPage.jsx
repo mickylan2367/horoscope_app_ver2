@@ -1017,13 +1017,13 @@ export function DiaryBookContent({
           .diary-book-shell-embedded .diary-page-list .diary-page-inner,
           .diary-book-shell-embedded .diary-page-calendar .diary-page-inner,
           .diary-book-shell-embedded .diary-page-editor .diary-page-inner {
-            padding: 14px 14px 52px 16px;
+            padding: 14px 12px 66px 14px;
           }
 
           .diary-book-shell-embedded .diary-page-nav {
-            left: 16px;
-            right: 14px;
-            bottom: -4px;
+            left: 14px;
+            right: 12px;
+            bottom: 6px;
           }
 
           .diary-book-spine {
@@ -1040,8 +1040,8 @@ export function DiaryBookContent({
           }
 
           .diary-page-calendar .diary-page-inner {
-            padding-top: 36px;
-            padding-bottom: 66px;
+            padding-top: 26px;
+            padding-bottom: 72px;
           }
 
           .diary-page-editor .diary-page-inner {
@@ -1067,7 +1067,7 @@ export function DiaryBookContent({
           }
 
           .diary-sheet-calendar {
-            padding: 10px;
+            padding: 8px;
             margin-bottom: 10px;
           }
 

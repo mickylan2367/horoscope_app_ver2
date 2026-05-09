@@ -73,6 +73,7 @@ export default function RegisterPage({ onAuth }) {
         <p className="mt-3 text-center text-xs text-slate-400">
           Google signup will be added here.
         </p>
+
       </form>
     </Layout>
   );

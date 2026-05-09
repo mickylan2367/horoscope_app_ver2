@@ -6,7 +6,15 @@ from django.contrib.auth.models import User
 from django.test import TestCase
 from django.urls import reverse
 
-from .models import HoroscopeProfile, TarotCard, TarotDeck, TarotReading
+from .models import (
+    HoroscopeProfile,
+    TarotCard,
+    TarotConsultMessage,
+    TarotConsultSession,
+    TarotDeck,
+    TarotReading,
+    TarotReadingCard,
+)
 
 
 class HoroscopeProfileApiTests(TestCase):
@@ -291,3 +299,92 @@ class TarotApiTests(TestCase):
 
         self.assertEqual(deck_response.status_code, 404)
         self.assertEqual(card_response.status_code, 404)
+
+    @patch("chart.views.search_diary_chunks", return_value=[{"date": "2026-05-01", "text": "A diary note."}])
+    @patch("chart.views.ensure_user_diary_index", return_value={"chunkCount": 1})
+    @patch("chart.views.generate_ai_tarot_consult_reply", return_value="The card asks you to pause.")
+    def test_tarot_consult_uses_owned_reading_context(self, mocked_generate, mocked_ensure, mocked_search):
+        self.client.force_login(self.user)
+        reading = TarotReading.objects.create(
+            user=self.user,
+            deck=self.deck,
+            spread_type=TarotReading.SPREAD_ONE_CARD,
+            question="What should I notice?",
+            ai_interpretation="A quiet message.",
+        )
+        TarotReadingCard.objects.create(
+            reading=reading,
+            card=self.deck.cards.first(),
+            position=1,
+            position_label="Message",
+            is_reversed=False,
+            card_name_snapshot="The Fool",
+            meaning_snapshot="A first step.",
+        )
+
+        response = self.client.post(
+            reverse("api_tarot_reading_consult", args=[reading.pk]),
+            data=json.dumps({"message": "What is the smallest next step?"}),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["reply"], "The card asks you to pause.")
+        self.assertEqual(data["readingId"], reading.pk)
+        self.assertEqual(data["references"]["question"], "What should I notice?")
+        self.assertEqual(data["references"]["cards"][0]["name"], "The Fool")
+        self.assertEqual([message["role"] for message in data["messages"]], ["user", "assistant"])
+        self.assertEqual(TarotConsultSession.objects.filter(user=self.user, reading=reading).count(), 1)
+        self.assertEqual(TarotConsultMessage.objects.count(), 2)
+        self.assertEqual(data["diaryReferences"][0]["text"], "A diary note.")
+        mocked_generate.assert_called_once()
+        mocked_ensure.assert_called_once_with(self.user)
+        mocked_search.assert_called_once()
+
+    @patch("chart.views.search_diary_chunks", return_value=[])
+    @patch("chart.views.ensure_user_diary_index", return_value={"chunkCount": 0})
+    @patch("chart.views.generate_ai_tarot_consult_reply", return_value="A saved reply.")
+    def test_tarot_consult_get_returns_saved_history(self, mocked_generate, mocked_ensure, mocked_search):
+        self.client.force_login(self.user)
+        reading = TarotReading.objects.create(user=self.user, deck=self.deck, question="Saved question")
+
+        post_response = self.client.post(
+            reverse("api_tarot_reading_consult", args=[reading.pk]),
+            data=json.dumps({"message": "Please remember this."}),
+            content_type="application/json",
+        )
+        self.assertEqual(post_response.status_code, 200)
+
+        get_response = self.client.get(reverse("api_tarot_reading_consult", args=[reading.pk]))
+
+        self.assertEqual(get_response.status_code, 200)
+        data = get_response.json()
+        self.assertEqual(data["session"]["title"], "Saved question")
+        self.assertEqual([message["content"] for message in data["messages"]], ["Please remember this.", "A saved reply."])
+        mocked_generate.assert_called_once()
+
+    def test_tarot_consult_rejects_empty_message(self):
+        self.client.force_login(self.user)
+        reading = TarotReading.objects.create(user=self.user, deck=self.deck, question="Question")
+
+        response = self.client.post(
+            reverse("api_tarot_reading_consult", args=[reading.pk]),
+            data=json.dumps({"message": "   "}),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+
+    def test_tarot_consult_rejects_other_user_reading(self):
+        other = User.objects.create_user(username="other-reader", password="pass12345")
+        reading = TarotReading.objects.create(user=other, deck=self.deck, question="Private")
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            reverse("api_tarot_reading_consult", args=[reading.pk]),
+            data=json.dumps({"message": "Can I ask?"}),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 404)

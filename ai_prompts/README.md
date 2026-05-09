@@ -22,6 +22,9 @@
 13. `13_bookdesign_tarot_index_prompt.md`
 14. `14_tarot_readings_in_diary_list_prompt.md`
 15. `15_mobile_polish_vs_deployment_prompt.md`
+16. `16_diary_second_self_architecture_prompt.md`
+17. `17_diary_second_self_backend_prompt.md`
+18. `18_diary_second_self_frontend_prompt.md`
 
 ## 今回追加した指示書
 
@@ -29,6 +32,9 @@
 - `13_bookdesign_tarot_index_prompt.md`: `bookdesign` の本の中に `TAROT INDEX` を組み込むための設計。
 - `14_tarot_readings_in_diary_list_prompt.md`: 保存済みタロット結果を日記一覧へ日付順で統合するための設計。
 - `15_mobile_polish_vs_deployment_prompt.md`: スマホ調整とAWS構築の優先順位を相談するための計画。
+- `16_diary_second_self_architecture_prompt.md`: タロット相談を先に作り、日記Second Selfへ拡張するReflection Chat全体設計。日記vectorはアプリ側DBで管理する方針。
+- `17_diary_second_self_backend_prompt.md`: タロット相談API、相談履歴、Django管理のembedding検索による日記RAG拡張を見据えた設計。
+- `18_diary_second_self_frontend_prompt.md`: 本UIの `TAROT CONSULT` ページと、将来の日記Second Selfを見据えたReact設計。日記全文を毎回AIへ送らない説明UIを含む。
 
 ## 共通ルール
 
@@ -37,4 +43,3 @@
 - ユーザーが「実装して」と言うまでは、設計だけの依頼でコード変更しないこと。
 - React側は `react_frontend/`、Django側は `django_backend/` を中心に見ること。
 - フロント変更後は `npm run lint`、バックエンド変更後は `python manage.py test` を確認項目に入れること。
-

@@ -1,6 +1,6 @@
 
 from django.shortcuts import render, redirect, get_object_or_404
-from .models import Diary, DiaryImage, Profile
+from .models import Diary, DiaryImage, DiaryMemoryChunk, Profile
 from .forms import DiaryForm,DiaryImageFormSet
 import markdown
 from django.contrib.auth.forms import UserCreationForm,PasswordChangeForm
@@ -19,6 +19,35 @@ from django.db.models import Prefetch
 from django.utils import timezone
 from django.utils.dateparse import parse_date
 from pathlib import Path
+from openai import OpenAI
+import os
+import re
+
+from .memory import (
+    diary_chunk_payload,
+    ensure_user_diary_index,
+    reindex_user_diaries,
+    search_diary_chunks,
+)
+
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+
+def plain_text_ai_reply(text, max_chars=None):
+    text = re.sub(r"```(?:\w+)?\n?([\s\S]*?)```", r"\1", text or "")
+    text = re.sub(r"^#{1,6}\s+", "", text, flags=re.MULTILINE)
+    text = re.sub(r"^\s*[-*+]\s+", "", text, flags=re.MULTILINE)
+    text = re.sub(r"^\s*\d+[.)]\s+", "", text, flags=re.MULTILINE)
+    text = re.sub(r"[*_`]+", "", text)
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    text = text.strip()
+    if max_chars and len(text) > max_chars:
+        clipped = text[:max_chars]
+        sentence_end = max(clipped.rfind("。"), clipped.rfind("！"), clipped.rfind("？"), clipped.rfind("."), clipped.rfind("!"), clipped.rfind("?"))
+        if sentence_end >= max_chars * 0.45:
+            return clipped[: sentence_end + 1].strip()
+        return clipped.rstrip("、, \n") + "..."
+    return text
 
 def home(request):
     return render(request, 'diaryapp/home.html')
@@ -485,6 +514,7 @@ def api_diary_create(request):
         date=date,
         content=content,
     )
+    DiaryMemoryChunk.objects.filter(diary=diary).delete()
 
     for index, image in enumerate(files):
         DiaryImage.objects.create(diary=diary, image=image, order=index)
@@ -542,6 +572,7 @@ def api_diary_detail(request, pk):
     diary.title = _diary_title_from_date(date)
     diary.content = content
     diary.save()
+    DiaryMemoryChunk.objects.filter(diary=diary).delete()
 
     start_order = existing_count
     for index, image in enumerate(files):
@@ -646,3 +677,103 @@ def api_diary_image_reorder(request, pk):
 
     refreshed = _diary_queryset().get(pk=diary.pk)
     return JsonResponse(_diary_payload(refreshed))
+
+
+@require_http_methods(["GET"])
+def api_diary_second_self_status(request):
+    auth_error = _login_required_json(request)
+    if auth_error:
+        return auth_error
+
+    return JsonResponse(
+        {
+            "diaryCount": Diary.objects.filter(user=request.user).count(),
+            "chunkCount": DiaryMemoryChunk.objects.filter(user=request.user).count(),
+            "indexedDiaryCount": DiaryMemoryChunk.objects.filter(user=request.user).values("diary_id").distinct().count(),
+        }
+    )
+
+
+@require_http_methods(["POST"])
+def api_diary_second_self_reindex(request):
+    auth_error = _login_required_json(request)
+    if auth_error:
+        return auth_error
+
+    try:
+        return JsonResponse(reindex_user_diaries(request.user, force=True))
+    except Exception:
+        return JsonResponse({"error": "Diary memory index could not be rebuilt."}, status=503)
+
+
+def generate_second_self_reply(message, chunks):
+    message_length = len(message)
+    max_reply_chars = max(40, min(600, int(message_length * 1.4) + 20))
+    prompt = f"""
+You are Mirror Self, a reflective diary companion in LovelyWitch Life.
+Use only the provided diary excerpts as memory. Do not pretend to be the user.
+When you infer, clearly keep it gentle and uncertain.
+This is a dialogue with the user's own self, so keep it quiet and short.
+The latest user message is {message_length} characters long. The reply must be
+no more than about {max_reply_chars} characters. Match the latest user message
+length as much as possible. If the user wrote briefly, reply briefly; if the
+user wrote a long message, a longer reply is okay. Borrow the user's diary tone
+from the excerpts. Avoid explanations, summaries, labels, and lists unless the
+user asks for them. Sound like the user's own words gently answering back.
+Plain text only. Do not use Markdown. Do not use headings, bullet points,
+numbered lists, bold, code blocks, or quote formatting.
+
+Diary excerpts:
+{json.dumps(chunks, ensure_ascii=False, indent=2)}
+
+User message:
+{message}
+
+Reply in Japanese unless the user wrote in another language.
+""".strip()
+    response = client.responses.create(
+        model="gpt-5.4",
+        input=prompt,
+    )
+    return plain_text_ai_reply(response.output_text, max_chars=max_reply_chars)
+
+
+@require_http_methods(["POST"])
+def api_diary_second_self_chat(request):
+    auth_error = _login_required_json(request)
+    if auth_error:
+        return auth_error
+
+    try:
+        data = json.loads(request.body or "{}")
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
+
+    message = str(data.get("message", "")).strip()
+    if not message:
+        return JsonResponse({"error": "message is required"}, status=400)
+
+    try:
+        index_status = ensure_user_diary_index(request.user)
+        chunks = search_diary_chunks(request.user, message, limit=4)
+        reply = generate_second_self_reply(message, chunks)
+    except Exception:
+        return JsonResponse({"error": "Diary memory chat is temporarily unavailable."}, status=503)
+
+    return JsonResponse(
+        {
+            "reply": reply,
+            "references": chunks,
+            "index": index_status,
+        }
+    )
+
+
+@require_http_methods(["DELETE"])
+def api_diary_second_self_index(request):
+    auth_error = _login_required_json(request)
+    if auth_error:
+        return auth_error
+
+    deleted, _ = DiaryMemoryChunk.objects.filter(user=request.user).delete()
+    return JsonResponse({"ok": True, "deleted": deleted})

@@ -869,6 +869,64 @@ const tarotDeckLibraryStyles = `
     background: rgba(255, 207, 159, 0.14);
     border-color: rgba(255, 207, 159, 0.28);
   }
+
+  @media (max-width: 760px) {
+    .tarot-library-page {
+      margin-top: -24px;
+    }
+
+    .tarot-library-hero {
+      align-items: flex-start;
+      gap: 10px;
+      padding: 10px 12px;
+    }
+
+    .tarot-library-title {
+      width: 100%;
+      font-size: 1.05rem;
+    }
+
+    .tarot-library-hero > div {
+      width: 100%;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .tarot-library-hero > div:has(a:nth-child(3)) {
+      grid-template-columns: 1fr;
+    }
+
+    .tarot-library-header-btn {
+      min-height: 40px;
+      padding: 0 12px;
+      font-size: 0.72rem;
+      letter-spacing: 0.02em;
+    }
+
+    .tarot-library-shelf,
+    .tarot-library-counter {
+      border-width: 1.5px;
+    }
+
+    .tarot-library-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .tarot-library-deck-card {
+      padding: 12px;
+    }
+
+    .tarot-library-deck-cover {
+      max-width: min(230px, 78vw);
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .tarot-library-counter {
+      order: -1;
+    }
+  }
 `;
 
 export function TarotDeckDetailPage({ user }) {
@@ -1487,7 +1545,7 @@ function DeckPicker({ decks, selectedDeckId, onSelect, compact = false }) {
 
   return (
     <div>
-      <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-2 pt-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-2 pt-2 sm:gap-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {decks.map((deck) => {
           const selected = String(deck.id) === String(selectedDeckId);
           return (
@@ -1495,7 +1553,7 @@ function DeckPicker({ decks, selectedDeckId, onSelect, compact = false }) {
               key={deck.id}
               type="button"
               onClick={() => onSelect(String(deck.id))}
-              className={`${compact ? "min-w-[156px]" : "min-w-[148px]"} rounded-2xl border p-2 text-left transition hover:-translate-y-1 hover:bg-white/12 ${
+              className={`${compact ? "min-w-[132px] sm:min-w-[156px]" : "min-w-[136px] sm:min-w-[148px]"} rounded-2xl border p-2 text-left transition hover:-translate-y-1 hover:bg-white/12 ${
                 selected ? "border-[#f4c2c2] bg-[#f4c2c2]/12 shadow-[0_0_0_1px_rgba(244,194,194,0.26)]" : "border-white/10 bg-white/7"
               }`}
             >

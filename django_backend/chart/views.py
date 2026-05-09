@@ -1,6 +1,14 @@
 
 from django.shortcuts import render
-from .models import HoroscopeResult, TarotCard, TarotDeck, TarotReading, TarotReadingCard
+from .models import (
+    HoroscopeResult,
+    TarotCard,
+    TarotConsultMessage,
+    TarotConsultSession,
+    TarotDeck,
+    TarotReading,
+    TarotReadingCard,
+)
 from .forms import HoroscopeForm
 from .utils import calculate_ascendant_skyfield, get_lat_lon, calculate_planet_positions, heliocentric_longitudes,make_cache_key
 from skyfield.api import load, Topos   # ここは今まで通りでOK
@@ -24,6 +32,7 @@ from django.db.models import Count, Q
 from django.http import JsonResponse, RawPostDataException
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
+from diaryapp.memory import ensure_user_diary_index, search_diary_chunks
 
 # まず必要なモノをロード
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -355,6 +364,92 @@ def generate_ai_tarot_interpretation(tarot_payload):
         return text
     except Exception as e:
         return f"AI解釈の生成に失敗しました: {str(e)}"
+
+
+def _tarot_consult_references(reading):
+    return {
+        "question": reading.question,
+        "spreadType": reading.spread_type,
+        "createdAt": reading.created_at.isoformat(),
+        "cards": [
+            {
+                "name": card.card_name_snapshot,
+                "position": card.position_label,
+                "isReversed": card.is_reversed,
+                "meaning": card.meaning_snapshot,
+            }
+            for card in reading.cards.all()
+        ],
+    }
+
+
+def plain_text_ai_reply(text, max_chars=None):
+    text = re.sub(r"```(?:\w+)?\n?([\s\S]*?)```", r"\1", text or "")
+    text = re.sub(r"^#{1,6}\s+", "", text, flags=re.MULTILINE)
+    text = re.sub(r"^\s*[-*+]\s+", "", text, flags=re.MULTILINE)
+    text = re.sub(r"^\s*\d+[.)]\s+", "", text, flags=re.MULTILINE)
+    text = re.sub(r"[*_`]+", "", text)
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    text = text.strip()
+    if max_chars and len(text) > max_chars:
+        clipped = text[:max_chars]
+        sentence_end = max(clipped.rfind("。"), clipped.rfind("！"), clipped.rfind("？"), clipped.rfind("."), clipped.rfind("!"), clipped.rfind("?"))
+        if sentence_end >= max_chars * 0.45:
+            return clipped[: sentence_end + 1].strip()
+        return clipped.rstrip("、, \n") + "..."
+    return text
+
+
+def generate_ai_tarot_consult_reply(reading, message, history=None, diary_context=None):
+    tarot_payload = build_tarot_ai_payload(reading)
+    history_payload = history or []
+    diary_payload = diary_context or []
+    message_length = len(message)
+    max_reply_chars = max(40, min(600, int(message_length * 1.4) + 20))
+    prompt = f"""
+You are a calm tarot consultation partner inside LovelyWitch Life.
+Use only the saved tarot reading context and the user's latest message.
+Do not predict the future as certainty. Do not give medical, legal, financial,
+or emergency decisions. If the user sounds at risk, encourage contacting a
+trusted person or qualified local support.
+
+Tone:
+- speak like a quiet inner dialogue, not an outside fortune teller
+- the latest user message is {message_length} characters long
+- the reply must be no more than about {max_reply_chars} characters
+- match the latest user message length as much as possible
+- if the user wrote briefly, reply briefly; if the user wrote a long message, a longer reply is okay
+- borrow the user's diary tone from the related diary excerpts
+- avoid explanations, summaries, labels, and lists unless the user asks
+- sound like the user's own words gently answering back
+- plain text only; do not use Markdown
+- do not use headings, bullet points, numbered lists, bold, code blocks, or quote formatting
+
+Saved reading:
+{json.dumps(tarot_payload, ensure_ascii=False, indent=2)}
+
+Saved AI interpretation:
+{reading.ai_interpretation or "(none)"}
+
+Recent consult history:
+{json.dumps(history_payload, ensure_ascii=False, indent=2)}
+
+Related diary excerpts:
+{json.dumps(diary_payload, ensure_ascii=False, indent=2)}
+
+User message:
+{message}
+
+Reply in Japanese unless the user clearly wrote in another language.
+""".strip()
+    try:
+        response = client.responses.create(
+            model="gpt-5.4",
+            input=prompt,
+        )
+        return plain_text_ai_reply(response.output_text, max_chars=max_reply_chars)
+    except Exception as exc:
+        raise RuntimeError("Tarot consult reply could not be generated.") from exc
 
 
 def make_ai_cache_key(prefix, payload):
@@ -1051,6 +1146,38 @@ def _tarot_reading_payload(reading, limit=None):
     }
 
 
+def _tarot_consult_message_payload(message):
+    return {
+        "id": message.pk,
+        "role": message.role,
+        "content": message.content,
+        "createdAt": message.created_at.isoformat(),
+        "created_at": message.created_at.isoformat(),
+    }
+
+
+def _tarot_consult_session_payload(session, reading):
+    messages = list(session.messages.all()) if session else []
+    return {
+        "session": {
+            "id": session.pk if session else None,
+            "title": session.title if session else "",
+            "createdAt": session.created_at.isoformat() if session else "",
+            "created_at": session.created_at.isoformat() if session else "",
+            "updatedAt": session.updated_at.isoformat() if session else "",
+            "updated_at": session.updated_at.isoformat() if session else "",
+        },
+        "readingId": reading.pk,
+        "reading_id": reading.pk,
+        "references": _tarot_consult_references(reading),
+        "messages": [_tarot_consult_message_payload(message) for message in messages],
+    }
+
+
+def _tarot_consult_title(reading):
+    return (reading.question or f"{reading.get_spread_type_display()} consult")[:160]
+
+
 def _json_body(request):
     try:
         return json.loads(request.body or "{}")
@@ -1461,3 +1588,91 @@ def api_tarot_reading_detail(request, pk):
     _trim_tarot_readings(request.user)
     reading = TarotReading.objects.select_related("deck", "user").prefetch_related("cards").get(pk=reading.pk)
     return JsonResponse(_tarot_reading_payload(reading))
+
+
+@require_http_methods(["GET", "POST"])
+def api_tarot_reading_consult(request, pk):
+    auth_error = _tarot_auth_error(request)
+    if auth_error:
+        return auth_error
+
+    try:
+        reading = (
+            TarotReading.objects.filter(user=request.user)
+            .select_related("deck", "user")
+            .prefetch_related("cards")
+            .get(pk=pk)
+        )
+    except TarotReading.DoesNotExist:
+        return JsonResponse({"error": "Reading not found"}, status=404)
+
+    session = (
+        TarotConsultSession.objects.filter(user=request.user, reading=reading)
+        .prefetch_related("messages")
+        .first()
+    )
+    if request.method == "GET":
+        return JsonResponse(_tarot_consult_session_payload(session, reading))
+
+    try:
+        data = _json_body(request)
+    except ValueError as exc:
+        return JsonResponse({"error": str(exc)}, status=400)
+
+    message = str(data.get("message", "")).strip()
+    if not message:
+        return JsonResponse({"error": "message is required"}, status=400)
+
+    session, _ = TarotConsultSession.objects.get_or_create(
+        user=request.user,
+        reading=reading,
+        defaults={"title": _tarot_consult_title(reading)},
+    )
+    history = [
+        {"role": item.role, "content": item.content}
+        for item in session.messages.order_by("-created_at", "-id")[:6]
+    ]
+    history.reverse()
+    diary_references = []
+    diary_index = None
+    try:
+        diary_index = ensure_user_diary_index(request.user)
+        diary_references = search_diary_chunks(request.user, message, limit=4)
+    except Exception:
+        diary_references = []
+        diary_index = None
+
+    try:
+        reply = generate_ai_tarot_consult_reply(
+            reading,
+            message,
+            history=history,
+            diary_context=diary_references,
+        )
+    except RuntimeError:
+        return JsonResponse({"error": "Tarot consult is temporarily unavailable."}, status=503)
+
+    with transaction.atomic():
+        TarotConsultMessage.objects.create(
+            session=session,
+            role=TarotConsultMessage.ROLE_USER,
+            content=message,
+        )
+        TarotConsultMessage.objects.create(
+            session=session,
+            role=TarotConsultMessage.ROLE_ASSISTANT,
+            content=reply,
+        )
+
+    session = (
+        TarotConsultSession.objects.filter(pk=session.pk)
+        .prefetch_related("messages")
+        .get()
+    )
+    payload = _tarot_consult_session_payload(session, reading)
+    payload["reply"] = reply
+    payload["diaryReferences"] = diary_references
+    payload["diary_references"] = diary_references
+    payload["diaryIndex"] = diary_index
+    payload["diary_index"] = diary_index
+    return JsonResponse(payload)

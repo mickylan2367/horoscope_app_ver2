@@ -370,7 +370,7 @@ export default function BookDesign({ user }) {
                   <div className="chooser-eyebrow">Chart</div>
                   <h3>Open Akashic Index</h3>
                   <p>
-                    Continue with the current chart app pages and open the shared free index.
+                    Open the current chart app pages and the shared free index.
                   </p>
                 </div>
               </button>
@@ -665,12 +665,7 @@ export default function BookDesign({ user }) {
         content: (
           <div className="book-tarot-result-content">
             {tarotBookReading ? (
-              <>
-                <TarotReadingCards result={tarotBookReading} />
-                <p className="mt-5 text-sm text-slate-400">
-                  Remaining saved readings: {tarotBookReading.remaining}/{tarotBookReading.limit}
-                </p>
-              </>
+              <TarotReadingCards result={tarotBookReading} />
             ) : (
               <p className="rounded-xl border border-white/10 bg-white/8 px-4 py-3 text-sm text-slate-200">Your reading will appear here.</p>
             )}
@@ -684,12 +679,24 @@ export default function BookDesign({ user }) {
         content: (
           <div className="book-tarot-result-content">
             {tarotBookReading ? (
-              <div className="book-tarot-message-scroll">
-                <TarotReadingMessage result={tarotBookReading} />
-              </div>
+              <>
+                <div className="book-tarot-message-scroll">
+                  <TarotReadingMessage result={tarotBookReading} />
+                </div>
+              </>
             ) : (
               <p className="rounded-xl border border-white/10 bg-white/8 px-4 py-3 text-sm text-slate-200">Your reading will appear here.</p>
             )}
+          </div>
+        ),
+      });
+      items.splice(6, 0, {
+        key: "tarot-consult",
+        title: "TAROT CONSULT",
+        subtitle: "talk with the reading",
+        content: (
+          <div className="book-tarot-result-content book-tarot-consult-content">
+            <TarotConsultPanel reading={tarotBookReading} onBackToMessage={() => setCurrentPage(5)} />
           </div>
         ),
       });
@@ -809,7 +816,7 @@ export default function BookDesign({ user }) {
                       {">"}
                     </button>
                   ) : null}
-                  {(currentPage === 3 || currentPage === 4) && tarotBookReading ? (
+                  {(currentPage === 3 || currentPage === 4 || currentPage === 5) && tarotBookReading ? (
                     <button onClick={() => setCurrentPage((page) => page + 1)} type="button">
                       {">"}
                     </button>
@@ -844,6 +851,120 @@ export default function BookDesign({ user }) {
         </div>
       </div>
     </>
+  );
+}
+
+function TarotConsultPanel({ reading, onBackToMessage }) {
+  const initialMessages = useMemo(() => [
+    {
+      role: "assistant",
+      content: "Ask about this saved reading. I will stay close to the cards, the question, and the message already on the page.",
+    },
+  ], []);
+  const [messages, setMessages] = useState([
+    {
+      role: "assistant",
+      content: "Ask about this saved reading. I will stay close to the cards, the question, and the message already on the page.",
+    },
+  ]);
+  const [input, setInput] = useState("");
+  const [sending, setSending] = useState(false);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!reading?.id) {
+      setMessages(initialMessages);
+      return undefined;
+    }
+
+    let active = true;
+    setLoadingHistory(true);
+    setError("");
+    apiFetch(`/api/tarot/readings/${reading.id}/consult/`)
+      .then((data) => {
+        if (!active) return;
+        setMessages(data.messages?.length ? data.messages : initialMessages);
+      })
+      .catch((err) => {
+        if (!active) return;
+        setMessages(initialMessages);
+        setError(err.message || "Could not load the consult history.");
+      })
+      .finally(() => {
+        if (active) setLoadingHistory(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [initialMessages, reading?.id]);
+
+  const sendMessage = async (event) => {
+    event.preventDefault();
+    const message = input.trim();
+    if (!message || !reading?.id || sending) return;
+
+    setMessages((current) => [...current, { role: "user", content: message }]);
+    setInput("");
+    setError("");
+    setSending(true);
+    try {
+      const data = await apiFetch(`/api/tarot/readings/${reading.id}/consult/`, {
+        method: "POST",
+        body: JSON.stringify({ message }),
+      });
+      setMessages(data.messages?.length ? data.messages : (current) => [...current, { role: "assistant", content: data.reply }]);
+    } catch (err) {
+      setError(err.message || "Could not open the consult.");
+    } finally {
+      setSending(false);
+    }
+  };
+
+  if (!reading) {
+    return (
+      <div className="tarot-consult-empty">
+        <p>Draw cards first, then the consult page can open around that saved reading.</p>
+        <button type="button" onClick={onBackToMessage}>Back to message</button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="tarot-consult-panel">
+      <div className="tarot-consult-summary">
+        <div>
+          <p className="tarot-consult-kicker">{reading.spreadType}</p>
+          <h3>{reading.question || "Untitled reading"}</h3>
+        </div>
+        <button type="button" onClick={onBackToMessage}>Message</button>
+      </div>
+
+      <div className="tarot-consult-messages" aria-live="polite">
+        {loadingHistory ? <div className="tarot-consult-message tarot-consult-message-assistant">Loading previous consult...</div> : null}
+        {messages.map((message, index) => (
+          <div className={`tarot-consult-message tarot-consult-message-${message.role}`} key={message.id ?? `${message.role}-${index}`}>
+            {message.content}
+          </div>
+        ))}
+        {sending ? <div className="tarot-consult-message tarot-consult-message-assistant">Listening to the reading...</div> : null}
+      </div>
+
+      {error ? <p className="tarot-consult-error">{error}</p> : null}
+
+      <form className="tarot-consult-form" onSubmit={sendMessage}>
+        <textarea
+          value={input}
+          onChange={(event) => setInput(event.target.value)}
+          placeholder="Ask about this reading"
+          rows={3}
+        />
+        <button type="submit" disabled={!input.trim() || sending}>
+          {sending ? "SENDING..." : "SEND"}
+        </button>
+      </form>
+    </div>
   );
 }
 
@@ -1206,6 +1327,189 @@ const sharedStyles = `
     line-height: 1.9;
     color: rgba(245,247,255,0.93);
     text-align: justify;
+  }
+
+  .book-tarot-consult-content {
+    display: flex;
+    padding-bottom: 90px;
+  }
+
+  .tarot-consult-panel {
+    min-height: 100%;
+    width: 100%;
+    display: grid;
+    grid-template-rows: auto auto minmax(0, 1fr) auto auto;
+    gap: 12px;
+    color: #f5f7ff;
+  }
+
+  .tarot-consult-summary {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 14px;
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 16px;
+    background: rgba(255,255,255,0.07);
+    padding: 14px;
+  }
+
+  .tarot-consult-summary h3 {
+    margin: 4px 0 0;
+    color: #fff;
+    font-size: 18px;
+    line-height: 1.4;
+  }
+
+  .tarot-consult-summary button,
+  .tarot-consult-empty button {
+    flex: 0 0 auto;
+    border: 1px solid rgba(255,255,255,0.16);
+    border-radius: 999px;
+    background: rgba(255,255,255,0.08);
+    color: #fff;
+    padding: 8px 12px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .tarot-consult-kicker {
+    margin: 0;
+    color: #f4c2c2;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+  }
+
+  .tarot-consult-messages {
+    min-height: 0;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 0 4px 8px 0;
+    scrollbar-width: none;
+  }
+
+  .tarot-consult-messages::-webkit-scrollbar {
+    display: none;
+  }
+
+  .tarot-consult-message {
+    max-width: 88%;
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 16px;
+    padding: 12px 14px;
+    white-space: pre-line;
+    font-size: 14px;
+    line-height: 1.75;
+  }
+
+  .tarot-consult-message-assistant {
+    align-self: flex-start;
+    background: rgba(255,255,255,0.08);
+    color: rgba(245,247,255,0.92);
+  }
+
+  .tarot-consult-message-user {
+    align-self: flex-end;
+    background: rgba(244,194,194,0.16);
+    color: #fff;
+  }
+
+  .tarot-consult-error {
+    margin: 0;
+    border: 1px solid rgba(255,126,126,0.36);
+    border-radius: 12px;
+    background: rgba(255,126,126,0.12);
+    color: #ffd6d6;
+    padding: 10px 12px;
+    font-size: 13px;
+  }
+
+  .tarot-consult-form {
+    display: grid;
+    grid-template-columns: minmax(0, 4fr) minmax(88px, 1fr);
+    gap: 10px;
+    align-items: stretch;
+    margin-bottom: 34px;
+  }
+
+  .tarot-consult-form textarea {
+    width: 100%;
+    min-height: 74px;
+    resize: vertical;
+    border: 1px solid rgba(255,255,255,0.14);
+    border-radius: 14px;
+    background: rgba(255,255,255,0.08);
+    color: #fff;
+    padding: 12px 14px;
+    outline: none;
+  }
+
+  .tarot-consult-form button {
+    position: relative;
+    overflow: hidden;
+    min-height: 46px;
+    width: 100%;
+    border: 1px solid rgba(244,194,194,0.52);
+    border-radius: 12px;
+    background:
+      radial-gradient(circle at 24% 22%, rgba(255,255,255,0.28), transparent 24%),
+      linear-gradient(135deg, rgba(244,194,194,0.26), rgba(216,196,255,0.14));
+    color: #ffe4ec;
+    padding: 0 18px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    cursor: pointer;
+    box-shadow:
+      0 10px 24px rgba(244,194,194,0.14),
+      inset 0 1px 0 rgba(255,255,255,0.16);
+    transition:
+      transform 0.18s ease,
+      border-color 0.18s ease,
+      background 0.18s ease,
+      box-shadow 0.18s ease,
+      filter 0.18s ease;
+  }
+
+  .tarot-consult-form button::after {
+    content: "";
+    position: absolute;
+    inset: 8px;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.12);
+    pointer-events: none;
+  }
+
+  .tarot-consult-form button:hover:not(:disabled) {
+    cursor: pointer;
+    transform: translateY(-1px);
+    border-color: rgba(255,232,246,0.72);
+    background:
+      radial-gradient(circle at 24% 22%, rgba(255,255,255,0.34), transparent 24%),
+      linear-gradient(135deg, rgba(244,194,194,0.34), rgba(216,196,255,0.22));
+    box-shadow:
+      0 14px 30px rgba(244,194,194,0.22),
+      0 0 18px rgba(255,255,255,0.12),
+      inset 0 1px 0 rgba(255,255,255,0.2);
+  }
+
+  .tarot-consult-form button:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+
+  .tarot-consult-empty {
+    margin: auto;
+    max-width: 420px;
+    display: grid;
+    gap: 16px;
+    place-items: center;
+    text-align: center;
+    color: rgba(245,247,255,0.9);
   }
 
   .book-tarot-reading-content section,
@@ -1716,8 +2020,8 @@ const sharedStyles = `
     flex-direction: column;
     padding: 8px 10px 0;
     border-radius: 18px;
-    background:    rgba(31, 34, 56, 0.78);
-    backdrop-filter: blur(4px);
+    background: transparent;
+    backdrop-filter: none;
   }
 
   .index-note {
@@ -2302,6 +2606,7 @@ const sharedStyles = `
     .chooser-grid {
       grid-template-columns: 1fr;
       padding-left: 0;
+      gap: 12px;
     }
 
     .chooser-card {
@@ -2531,12 +2836,101 @@ const sharedStyles = `
   @media (max-width: 760px) {
     .book-shell {
       width: calc(100vw - 18px);
-      height: calc(100vh - 100px);
+      height: calc(100vh - 86px);
+      height: calc(100dvh - 86px);
+      margin: 10px auto 18px;
     }
 
     .page {
-      padding: 26px 20px 88px 28px;
+      padding: 22px 16px 76px 26px;
       margin-left: 0;
+    }
+
+    .chooser-page {
+      justify-content: center;
+      gap: 12px;
+      padding: 0;
+    }
+
+    .chooser-card {
+      grid-template-columns: minmax(76px, 92px) minmax(0, 1fr);
+      gap: 12px;
+      min-height: 122px;
+      padding: 12px;
+      border-radius: 18px;
+    }
+
+    .chooser-media-frame {
+      border-radius: 14px;
+    }
+
+    .chooser-card h3 {
+      font-size: 16px;
+      line-height: 1.22;
+    }
+
+    .chooser-card p {
+      display: none;
+    }
+
+    .chooser-eyebrow {
+      margin-bottom: 5px;
+      font-size: 10px;
+      letter-spacing: 0.16em;
+    }
+
+    .tarot-index-page {
+      gap: 12px;
+      padding: 8px 2px 4px;
+    }
+
+    .tarot-index-card {
+      min-height: 190px;
+      padding: 14px;
+    }
+
+    .tarot-index-art {
+      width: min(200px, 58vw);
+    }
+
+    .book-tarot-reading-content,
+    .book-tarot-result-content {
+      margin: -6px -10px -36px -18px;
+      padding: 4px 8px 70px 24px;
+    }
+
+    .book-tarot-reading-content section,
+    .book-tarot-result-content section {
+      padding: 12px;
+    }
+
+    .tarot-consult-panel {
+      gap: 10px;
+      min-height: 100%;
+    }
+
+    .tarot-consult-summary {
+      padding: 12px;
+    }
+
+    .tarot-consult-summary h3 {
+      font-size: 15px;
+    }
+
+    .tarot-consult-message {
+      max-width: 96%;
+      font-size: 13px;
+      line-height: 1.65;
+    }
+
+    .tarot-consult-form {
+      grid-template-columns: minmax(0, 4fr) minmax(74px, 1fr);
+      gap: 8px;
+    }
+
+    .tarot-consult-form textarea {
+      min-height: 68px;
+      resize: none;
     }
 
     .diary-entry-cover {
@@ -2549,7 +2943,14 @@ const sharedStyles = `
     }
 
     .reading-title {
-      font-size: 21px;
+      margin-bottom: 8px;
+      font-size: 18px;
+    }
+
+    .reading-subtitle {
+      margin-bottom: 12px;
+      font-size: 11px;
+      letter-spacing: 0.14em;
     }
 
     .index-list {
@@ -2557,9 +2958,15 @@ const sharedStyles = `
     }
 
     .book-nav {
-      left: 20px;
-      right: 10px;
-      bottom: 14px;
+      left: 22px;
+      right: 8px;
+      bottom: 10px;
+    }
+
+    .book-nav button {
+      width: 46px;
+      height: 40px;
+      font-size: 19px;
     }
 
     .chart-box img {

@@ -205,3 +205,40 @@ class TarotReadingCard(models.Model):
 
     def __str__(self):
         return f"{self.reading_id}:{self.position}:{self.card_name_snapshot}"
+
+
+class TarotConsultSession(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="tarot_consult_sessions")
+    reading = models.ForeignKey(TarotReading, on_delete=models.CASCADE, related_name="consult_sessions")
+    title = models.CharField(max_length=160, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-updated_at", "-id"]
+        constraints = [
+            models.UniqueConstraint(fields=["user", "reading"], name="unique_tarot_consult_session_user_reading"),
+        ]
+
+    def __str__(self):
+        return self.title or f"Consult {self.reading_id}"
+
+
+class TarotConsultMessage(models.Model):
+    ROLE_USER = "user"
+    ROLE_ASSISTANT = "assistant"
+    ROLE_CHOICES = [
+        (ROLE_USER, "User"),
+        (ROLE_ASSISTANT, "Assistant"),
+    ]
+
+    session = models.ForeignKey(TarotConsultSession, on_delete=models.CASCADE, related_name="messages")
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES)
+    content = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ["created_at", "id"]
+
+    def __str__(self):
+        return f"{self.session_id}:{self.role}"
