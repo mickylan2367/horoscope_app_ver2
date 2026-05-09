@@ -21,6 +21,8 @@ export default function Layout({
   backgroundVariant = "base",
   headerVariant = "pink",
   hideAuthActions = false,
+  hideHeader = false,
+  hideBackground = false,
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -116,8 +118,8 @@ export default function Layout({
 
   return (
     <div className="relative min-h-screen bg-[#070b17] text-[#eae5f6]">
-      <CosmicBackground variant={backgroundVariant} />
-      <header className={headerClassName}>
+      {!hideBackground ? <CosmicBackground variant={backgroundVariant} /> : null}
+      {!hideHeader ? <header className={headerClassName}>
         <div
           className={`mx-auto flex max-w-6xl items-center justify-between px-6 ${
             compactHeader ? "py-3 md:px-8 md:py-3" : "py-4 md:px-10"
@@ -284,7 +286,7 @@ export default function Layout({
             </div>
           </div>
         )}
-      </header>
+      </header> : null}
 
       <main
         className={`relative z-10 mx-auto px-6 py-8 md:px-10 ${

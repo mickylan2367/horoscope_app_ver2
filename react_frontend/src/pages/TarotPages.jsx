@@ -2,14 +2,15 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, BookOpen, Check, Edit3, Image as ImageIcon, Plus, Search, Sparkles, Star, Trash2 } from "lucide-react";
 import Layout from "../components/Layout";
+import StarrySky from "../components/StarrySky.jsx";
 import { apiFetch } from "../api";
 
 const ARCANA_OPTIONS = ["major", "minor", "oracle"];
 const SUIT_OPTIONS = ["none", "cups", "pentacles", "swords", "wands"];
 
-function TarotShell({ children, user, wide = false }) {
+function TarotShell({ children, user, wide = false, hideHeader = false, hideBackground = false }) {
   return (
-    <Layout user={user} wide={wide} headerVariant="cosmic" backgroundVariant="hero">
+    <Layout user={user} wide={wide} headerVariant="cosmic" backgroundVariant="hero" hideHeader={hideHeader} hideBackground={hideBackground}>
       {children}
     </Layout>
   );
@@ -32,8 +33,57 @@ function LoadingNotice() {
   return <p className="rounded-xl border border-white/10 bg-white/8 px-4 py-3 text-sm text-slate-200">Loading...</p>;
 }
 
+function TarotLibraryPageFrame({ children, showDeckListButton = false }) {
+  return (
+    <>
+      <style>{tarotDeckLibraryStyles}</style>
+      <div className="tarot-library-page mx-auto max-w-7xl">
+        <StarrySky fixed tone="warm" />
+        <TarotLibraryHeader showDeckListButton={showDeckListButton} />
+        {children}
+      </div>
+    </>
+  );
+}
+
+function TarotLibraryHeader({ showDeckListButton = false }) {
+  return (
+    <div className="tarot-library-hero mb-6 flex flex-wrap items-center justify-between gap-4">
+      <h1 className="tarot-library-title">Card Library</h1>
+      <div className="flex flex-wrap items-center gap-3">
+        {showDeckListButton ? (
+          <Link to="/tarot/decks" className="tarot-library-header-btn tarot-library-soft-btn inline-flex items-center gap-2 rounded-full text-sm font-semibold text-white transition hover:text-white">
+            <ArrowLeft className="h-4 w-4" />
+            BACK TO DECK LIST
+          </Link>
+        ) : null}
+        <Link to="/diary/warp" state={{ target: "/bookdesign", targetState: { bookSection: "tarot" } }} className="tarot-library-header-btn tarot-library-soft-btn inline-flex items-center gap-2 rounded-full text-sm font-semibold text-[#f4c2c2] transition hover:text-white">
+          <ArrowLeft className="h-4 w-4" />
+          BACK TO BOOK
+        </Link>
+        <Link to="/bookdesign" state={{ bookSection: "tarot", tarotPage: "draw" }} className="tarot-library-header-btn tarot-library-draw-btn inline-flex items-center gap-2 rounded-full text-sm font-semibold">
+          <Sparkles className="h-4 w-4" /> DRAW
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+function dateKeyFromTimestamp(value) {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "";
+  const year = parsed.getFullYear();
+  const month = String(parsed.getMonth() + 1).padStart(2, "0");
+  const day = String(parsed.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 function cardImage(card) {
   return card.image || "";
+}
+
+function deckCoverImage(deck) {
+  return deck.coverImage || deck.cover_image || "";
 }
 
 const MAJOR_ARCANA_CORRESPONDENCES = {
@@ -457,11 +507,10 @@ export function TarotHomePage({ user }) {
           <p className="mb-3 text-sm uppercase tracking-[0.28em] text-[#f4c2c2]">Tarot</p>
           <h1 className="text-4xl font-semibold text-white md:text-5xl">Cards, readings, and saved signs</h1>
         </div>
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2">
           {[
             { to: "/tarot/decks", icon: BookOpen, title: "Decks", text: "Browse the default 78 cards or create your own deck." },
             { to: "/tarot/read", icon: Sparkles, title: "Draw", text: "Ask a question and draw one or three cards." },
-            { to: "/tarot/readings", icon: Star, title: "Saved", text: "Review readings, pin what matters, and prune the rest." },
           ].map((item) => {
             const Icon = item.icon;
             return (
@@ -483,8 +532,12 @@ export function TarotDeckListPage({ user }) {
   const [error, setError] = useState("");
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [coverImage, setCoverImage] = useState("");
+  const [coverImageFile, setCoverImageFile] = useState(null);
   const [deckType, setDeckType] = useState("tarot");
   const [allowReversed, setAllowReversed] = useState(true);
+  const coverInputRef = useRef(null);
+  const coverPreviewUrl = useMemo(() => (coverImageFile ? URL.createObjectURL(coverImageFile) : ""), [coverImageFile]);
 
   const loadDecks = () => {
     setError("");
@@ -499,48 +552,89 @@ export function TarotDeckListPage({ user }) {
     event.preventDefault();
     setError("");
     try {
+      const body = coverImageFile
+        ? Object.entries({ name, description, coverImage, deckType, allowReversed }).reduce((formData, [key, value]) => {
+            formData.append(key, value ?? "");
+            return formData;
+          }, new FormData())
+        : JSON.stringify({ name, description, coverImage, deckType, allowReversed });
+      if (coverImageFile) {
+        body.append("coverImageFile", coverImageFile);
+      }
       await apiFetch("/api/tarot/decks/", {
         method: "POST",
-        body: JSON.stringify({ name, description, deckType, allowReversed }),
+        body,
       });
       setName("");
       setDescription("");
+      setCoverImage("");
+      setCoverImageFile(null);
+      if (coverInputRef.current) {
+        coverInputRef.current.value = "";
+      }
       loadDecks();
     } catch (err) {
       setError(err.message || "Failed to create deck.");
     }
   };
 
+  useEffect(() => {
+    const objectUrl = coverPreviewUrl;
+    return () => {
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
+      }
+    };
+  }, [coverPreviewUrl]);
+
   return (
-    <TarotShell user={user} wide>
-      <div className="mx-auto max-w-7xl">
-        <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <Link to="/tarot" className="mb-2 inline-flex items-center gap-2 text-sm uppercase tracking-[0.28em] text-[#f4c2c2] transition hover:text-white">
-              <ArrowLeft className="h-4 w-4" />
-              Tarot / Decks
-            </Link>
-            <h1 className="text-3xl font-semibold text-white">Deck Library</h1>
-          </div>
-          <Link to="/tarot/read" className="inline-flex items-center gap-2 rounded-full bg-[#f4c2c2] px-5 py-3 font-semibold text-[#2a2036]">
-            <Sparkles className="h-4 w-4" /> DRAW
-          </Link>
-        </div>
+    <TarotShell user={user} wide hideHeader hideBackground>
+      <TarotLibraryPageFrame>
         <ErrorNotice message={error} />
         {!data ? <LoadingNotice /> : null}
         {data ? (
           <div className="grid gap-5 lg:grid-cols-[1fr_360px]">
             <div className="space-y-6">
-              <DeckSection title="System Decks" decks={data.systemDecks} />
-              <DeckSection title="Shared Decks" decks={data.sharedDecks ?? []} />
-              <DeckSection title="My Decks" decks={data.myDecks} editable />
+              <DeckSection title="System & Shared Decks" label="Public Archive" decks={[...(data.systemDecks ?? []), ...(data.sharedDecks ?? [])]} />
+              <DeckSection title="My Decks" label="Private Shelf" decks={data.myDecks} editable />
             </div>
-            <Panel>
-              <h2 className="text-lg font-semibold text-white">Create Deck</h2>
+            <Panel className="tarot-library-counter">
+              <p className="text-xs uppercase tracking-[0.24em] text-[#ffcf9f]">Archive Counter</p>
+              <h2 className="mt-2 text-lg font-semibold text-white">Create Deck</h2>
               {user ? (
                 <form className="mt-4 space-y-4" onSubmit={createDeck}>
-                  <input className="w-full rounded-xl border border-white/10 bg-white/8 px-4 py-3 text-white outline-none" placeholder="Deck name" value={name} onChange={(event) => setName(event.target.value)} />
-                  <textarea className="min-h-28 w-full rounded-xl border border-white/10 bg-white/8 px-4 py-3 text-white outline-none" placeholder="Description" value={description} onChange={(event) => setDescription(event.target.value)} />
+                  <input className="tarot-library-input w-full rounded-xl px-4 py-3 text-white outline-none" placeholder="Deck name" value={name} onChange={(event) => setName(event.target.value)} />
+                  <textarea className="tarot-library-input min-h-28 w-full rounded-xl px-4 py-3 text-white outline-none" placeholder="Description" value={description} onChange={(event) => setDescription(event.target.value)} />
+                  <div className="tarot-library-cover-field grid gap-3 rounded-xl p-3">
+                    <div className="tarot-library-cover-preview aspect-[3/2] overflow-hidden rounded-lg">
+                      {coverPreviewUrl || coverImage ? (
+                        <img src={coverPreviewUrl || coverImage} alt="Deck cover preview" className="h-full w-full object-cover" />
+                      ) : (
+                        <TarotCardArt card={{ name: name || "New Deck" }} compact />
+                      )}
+                    </div>
+                    <input className="tarot-library-input w-full rounded-xl px-4 py-3 text-white outline-none" placeholder="Cover image URL" value={coverImage} onChange={(event) => setCoverImage(event.target.value)} disabled={Boolean(coverImageFile)} />
+                    <input ref={coverInputRef} className="hidden" type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => {
+                      const file = event.target.files?.[0] ?? null;
+                      setCoverImageFile(file);
+                      if (file) setCoverImage("");
+                    }} />
+                    <button className="tarot-library-soft-btn inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 font-semibold text-white transition" type="button" onClick={() => coverInputRef.current?.click()}>
+                      <ImageIcon className="h-4 w-4" />
+                      Cover
+                    </button>
+                    {coverImageFile ? (
+                      <p className="text-sm text-slate-300">
+                        Selected: {coverImageFile.name}{" "}
+                        <button className="font-semibold text-[#f4c2c2] hover:text-white" type="button" onClick={() => {
+                          setCoverImageFile(null);
+                          if (coverInputRef.current) coverInputRef.current.value = "";
+                        }}>
+                          clear
+                        </button>
+                      </p>
+                    ) : null}
+                  </div>
                   <select className="w-full rounded-xl border border-white/10 bg-[#221a32] px-4 py-3 text-white" value={deckType} onChange={(event) => setDeckType(event.target.value)}>
                     <option value="tarot">Tarot</option>
                     <option value="oracle">Oracle</option>
@@ -549,7 +643,7 @@ export function TarotDeckListPage({ user }) {
                     <input type="checkbox" checked={allowReversed} onChange={(event) => setAllowReversed(event.target.checked)} />
                     Allow reversed cards
                   </label>
-                  <button className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#f4c2c2] px-5 py-3 font-semibold text-[#2a2036]" type="submit">
+                  <button className="tarot-library-create-btn inline-flex w-full items-center justify-center gap-2 rounded-full px-5 py-3 font-semibold" type="submit">
                     <Plus className="h-4 w-4" /> CREATE
                   </button>
                 </form>
@@ -559,19 +653,32 @@ export function TarotDeckListPage({ user }) {
             </Panel>
           </div>
         ) : null}
-      </div>
+      </TarotLibraryPageFrame>
     </TarotShell>
   );
 }
 
-function DeckSection({ title, decks, editable = false }) {
+function DeckSection({ title, label, decks, editable = false }) {
   return (
-    <Panel>
-      <h2 className="mb-4 text-lg font-semibold text-white">{title}</h2>
+    <Panel className="tarot-library-shelf">
+      <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="text-xs uppercase tracking-[0.24em] text-[#ffcf9f]">{label}</p>
+          <h2 className="mt-2 text-xl font-semibold text-white">{title}</h2>
+        </div>
+        <span className="rounded-full border border-white/10 bg-white/8 px-3 py-1 text-xs text-slate-300">{decks.length} decks</span>
+      </div>
       {decks.length ? (
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        <div className="tarot-library-grid grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {decks.map((deck) => (
-            <Link key={deck.id} to={`/tarot/decks/${deck.id}`} className="rounded-xl border border-white/10 bg-white/7 p-4 transition hover:bg-white/11">
+            <Link key={deck.id} to={`/tarot/decks/${deck.id}`} className="tarot-library-deck-card rounded-xl p-4 transition">
+              <div className="tarot-library-deck-cover mb-4 aspect-[3/4] overflow-hidden rounded-lg">
+                {deckCoverImage(deck) ? (
+                  <img src={deckCoverImage(deck)} alt={`${deck.name} cover`} loading="lazy" decoding="async" className="h-full w-full object-cover" />
+                ) : (
+                  <TarotCardArt card={{ name: deck.name }} compact />
+                )}
+              </div>
               <div className="flex items-start justify-between gap-3">
                 <h3 className="font-semibold text-white">{deck.name}</h3>
                 <span className="rounded-full bg-white/8 px-2 py-1 text-xs text-slate-300">{deck.cardCount} cards</span>
@@ -592,18 +699,194 @@ function DeckSection({ title, decks, editable = false }) {
   );
 }
 
+const tarotDeckLibraryStyles = `
+  .tarot-library-page {
+    position: relative;
+    isolation: isolate;
+    margin-top: -32px;
+  }
+
+  .tarot-library-page::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background:
+      radial-gradient(circle at 18% 14%, rgba(255, 153, 96, 0.16), transparent 24%),
+      radial-gradient(circle at 82% 18%, rgba(192, 124, 255, 0.18), transparent 25%),
+      radial-gradient(circle at 44% 82%, rgba(244, 194, 194, 0.12), transparent 28%),
+      linear-gradient(180deg, rgba(5, 7, 20, 0.38), rgba(5, 7, 20, 0.82));
+  }
+
+  .tarot-library-hero {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    margin-left: calc(50% - 50vw);
+    margin-right: calc(50% - 50vw);
+    padding: 14px max(24px, calc((100vw - 1280px) / 2 + 24px));
+    border-bottom: 1px solid rgba(255,255,255,0.09);
+    background:
+      linear-gradient(90deg, rgba(12, 12, 28, 0.72), rgba(40, 25, 58, 0.58), rgba(12, 12, 28, 0.7)),
+      radial-gradient(circle at 88% 12%, rgba(255, 206, 148, 0.18), transparent 24%);
+    box-shadow: 0 16px 42px rgba(0,0,0,0.24), inset 0 1px 0 rgba(255,255,255,0.05);
+    backdrop-filter: blur(14px);
+    overflow: hidden;
+  }
+
+  .tarot-library-hero::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255, 207, 159, 0.52), rgba(244, 194, 194, 0.26), transparent);
+    pointer-events: none;
+  }
+
+  .tarot-library-hero h1 {
+    line-height: 1.05;
+  }
+
+  .tarot-library-title {
+    font-size: clamp(1.125rem, 1.7vw, 1.35rem);
+    line-height: 1.2;
+    font-weight: 700;
+    letter-spacing: 0.025em;
+    color: #efe8ff;
+    transition: color 180ms ease;
+  }
+
+  .tarot-library-draw-btn,
+  .tarot-library-create-btn {
+    border: 1px solid rgba(255, 207, 159, 0.48);
+    background: rgba(244, 194, 194, 0.14);
+    color: #ffe7d0;
+    box-shadow: 0 12px 34px rgba(244, 128, 99, 0.14);
+    transition: transform 180ms ease, background 180ms ease, box-shadow 180ms ease;
+  }
+
+  .tarot-library-draw-btn:hover,
+  .tarot-library-create-btn:hover {
+    transform: translateY(-1px);
+    background: rgba(244, 194, 194, 0.23);
+    box-shadow: 0 18px 42px rgba(244, 128, 99, 0.22);
+  }
+
+  .tarot-library-header-btn {
+    min-height: 44px;
+    padding: 0 18px;
+    justify-content: center;
+    white-space: nowrap;
+  }
+
+  .tarot-library-shelf,
+  .tarot-library-counter {
+    position: relative;
+    border-width: 2px;
+    border-color: rgba(255,255,255,0.22);
+    background: transparent;
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.045);
+    backdrop-filter: none;
+  }
+
+  .tarot-library-shelf {
+    overflow: hidden;
+  }
+
+  .tarot-library-grid {
+    position: relative;
+    z-index: 1;
+  }
+
+  .tarot-library-deck-card {
+    position: relative;
+    z-index: 1;
+    border: 1px solid rgba(255,255,255,0.1);
+    background:
+      linear-gradient(180deg, rgba(255,255,255,0.068), rgba(255,255,255,0.026)),
+      rgba(18, 17, 31, 0.48);
+    box-shadow: 0 14px 34px rgba(0,0,0,0.2);
+    overflow: hidden;
+  }
+
+  .tarot-library-deck-card::before {
+    content: "";
+    position: absolute;
+    inset: -40%;
+    background: linear-gradient(115deg, transparent 34%, rgba(255,255,255,0.22) 48%, transparent 62%);
+    opacity: 0;
+    transform: translateX(-35%);
+    transition: opacity 220ms ease, transform 520ms ease;
+    pointer-events: none;
+  }
+
+  .tarot-library-deck-card:hover {
+    transform: translateY(-4px);
+    border-color: rgba(255, 207, 159, 0.34);
+    background:
+      linear-gradient(180deg, rgba(255,255,255,0.095), rgba(255,255,255,0.038)),
+      rgba(28, 22, 41, 0.58);
+    box-shadow: 0 20px 44px rgba(0,0,0,0.28), 0 0 26px rgba(244,194,194,0.12);
+  }
+
+  .tarot-library-deck-card:hover::before {
+    opacity: 1;
+    transform: translateX(38%);
+  }
+
+  .tarot-library-deck-cover,
+  .tarot-library-cover-preview {
+    border: 1px solid rgba(255,255,255,0.11);
+    background: #241b34;
+    box-shadow: inset 0 0 26px rgba(255,255,255,0.05), 0 10px 24px rgba(0,0,0,0.22);
+  }
+
+  .tarot-library-counter {
+    align-self: start;
+  }
+
+  .tarot-library-input,
+  .tarot-library-cover-field {
+    border: 2px solid rgba(255,255,255,0.2);
+    background: transparent;
+  }
+
+  .tarot-library-input:focus {
+    border-color: rgba(255, 207, 159, 0.38);
+    box-shadow: 0 0 0 3px rgba(255, 207, 159, 0.1);
+  }
+
+  .tarot-library-soft-btn {
+    border: 1px solid rgba(255,255,255,0.12);
+    background: rgba(255,255,255,0.08);
+  }
+
+  .tarot-library-soft-btn:hover {
+    background: rgba(255, 207, 159, 0.14);
+    border-color: rgba(255, 207, 159, 0.28);
+  }
+`;
+
 export function TarotDeckDetailPage({ user }) {
   const { deckId } = useParams();
   const navigate = useNavigate();
+  const coverInputRef = useRef(null);
   const [data, setData] = useState(null);
   const [query, setQuery] = useState("");
   const [arcana, setArcana] = useState("all");
   const [error, setError] = useState("");
   const [shareConfirmOpen, setShareConfirmOpen] = useState(false);
   const [shareConfirmText, setShareConfirmText] = useState("");
+  const [coverImageFile, setCoverImageFile] = useState(null);
+  const coverPreviewUrl = useMemo(() => (coverImageFile ? URL.createObjectURL(coverImageFile) : ""), [coverImageFile]);
   const [deckForm, setDeckForm] = useState({
     name: "",
     description: "",
+    coverImage: "",
     deckType: "tarot",
     allowReversed: true,
     isPublic: false,
@@ -616,15 +899,29 @@ export function TarotDeckDetailPage({ user }) {
         setDeckForm({
           name: nextData.deck.name,
           description: nextData.deck.description ?? "",
+          coverImage: nextData.deck.coverImage ?? "",
           deckType: nextData.deck.deckType,
           allowReversed: nextData.deck.allowReversed,
           isPublic: nextData.deck.isPublic,
         });
+        setCoverImageFile(null);
+        if (coverInputRef.current) {
+          coverInputRef.current.value = "";
+        }
         setShareConfirmOpen(false);
         setShareConfirmText("");
       })
       .catch((err) => setError(err.message || "Failed to load deck."));
   }, [deckId]);
+
+  useEffect(() => {
+    const objectUrl = coverPreviewUrl;
+    return () => {
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
+      }
+    };
+  }, [coverPreviewUrl]);
 
   const filteredCards = useMemo(() => {
     const cards = data?.cards ?? [];
@@ -645,11 +942,25 @@ export function TarotDeckDetailPage({ user }) {
     event.preventDefault();
     setError("");
     try {
+      const body = coverImageFile
+        ? Object.entries(deckForm).reduce((formData, [key, value]) => {
+            formData.append(key, value ?? "");
+            return formData;
+          }, new FormData())
+        : JSON.stringify(deckForm);
+      if (coverImageFile) {
+        body.append("coverImageFile", coverImageFile);
+      }
       const updatedDeck = await apiFetch(`/api/tarot/decks/${deckId}/`, {
         method: "PUT",
-        body: JSON.stringify(deckForm),
+        body,
       });
       setData((current) => current ? { ...current, deck: updatedDeck } : current);
+      setDeckForm((current) => ({ ...current, coverImage: updatedDeck.coverImage ?? "" }));
+      setCoverImageFile(null);
+      if (coverInputRef.current) {
+        coverInputRef.current.value = "";
+      }
     } catch (err) {
       setError(err.message || "Failed to save deck.");
     }
@@ -701,27 +1012,33 @@ export function TarotDeckDetailPage({ user }) {
   };
 
   return (
-    <TarotShell user={user} wide>
-      <div className="mx-auto max-w-7xl">
+    <TarotShell user={user} wide hideHeader hideBackground>
+      <TarotLibraryPageFrame showDeckListButton>
         <ErrorNotice message={error} />
         {!data ? <LoadingNotice /> : null}
         {data ? (
           <>
             <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
-              <div>
-                <p className="mb-2 text-sm uppercase tracking-[0.28em] text-[#f4c2c2]">Tarot / Deck</p>
-                <h1 className="text-3xl font-semibold text-white">{data.deck.name}</h1>
-                <p className="mt-2 max-w-3xl text-sm leading-7 text-slate-300">{data.deck.description}</p>
+              <div className="flex flex-wrap items-end gap-4">
+                <div className="h-28 w-40 overflow-hidden rounded-xl border border-white/10 bg-[#241b34]">
+                  {deckCoverImage(data.deck) ? (
+                    <img src={deckCoverImage(data.deck)} alt={`${data.deck.name} cover`} className="h-full w-full object-cover" />
+                  ) : (
+                    <TarotCardArt card={{ name: data.deck.name }} compact />
+                  )}
+                </div>
+                <div>
+                  <p className="mb-2 text-sm uppercase tracking-[0.28em] text-[#f4c2c2]">Deck Archive</p>
+                  <h1 className="text-3xl font-semibold text-white">{data.deck.name}</h1>
+                  <p className="mt-2 max-w-3xl text-sm leading-7 text-slate-300">{data.deck.description}</p>
+                </div>
               </div>
               <div className="flex gap-3">
                 {canEditDeck ? (
-                  <Link to={`/tarot/decks/${data.deck.id}/cards/new`} className="inline-flex items-center gap-2 rounded-full bg-[#f4c2c2] px-5 py-3 font-semibold text-[#2a2036]">
+                  <Link to={`/tarot/decks/${data.deck.id}/cards/new`} className="tarot-library-create-btn inline-flex items-center gap-2 rounded-full px-5 py-3 font-semibold">
                     <Plus className="h-4 w-4" /> CARD
                   </Link>
                 ) : null}
-                <Link to="/tarot/read" className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/8 px-5 py-3 text-white">
-                  <Sparkles className="h-4 w-4" /> DRAW
-                </Link>
               </div>
             </div>
             <Panel className="mb-5">
@@ -754,6 +1071,44 @@ export function TarotDeckDetailPage({ user }) {
                       value={deckForm.description}
                       onChange={(event) => setDeckForm((current) => ({ ...current, description: event.target.value }))}
                     />
+                    <div className="grid gap-3 rounded-xl border border-white/10 bg-white/6 p-3">
+                      <div className="aspect-[3/2] overflow-hidden rounded-lg border border-white/10 bg-[#241b34]">
+                        {coverPreviewUrl || deckForm.coverImage ? (
+                          <img src={coverPreviewUrl || deckForm.coverImage} alt="Deck cover preview" className="h-full w-full object-cover" />
+                        ) : (
+                          <TarotCardArt card={{ name: deckForm.name || "Deck" }} compact />
+                        )}
+                      </div>
+                      <input
+                        className="w-full rounded-xl border border-white/10 bg-white/8 px-4 py-3 text-white outline-none"
+                        placeholder="Cover image URL"
+                        value={deckForm.coverImage}
+                        onChange={(event) => setDeckForm((current) => ({ ...current, coverImage: event.target.value }))}
+                        disabled={Boolean(coverImageFile)}
+                      />
+                      <input ref={coverInputRef} className="hidden" type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => {
+                        const file = event.target.files?.[0] ?? null;
+                        setCoverImageFile(file);
+                        if (file) {
+                          setDeckForm((current) => ({ ...current, coverImage: "" }));
+                        }
+                      }} />
+                      <button className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/12 bg-white/8 px-4 py-3 font-semibold text-white transition hover:bg-white/12" type="button" onClick={() => coverInputRef.current?.click()}>
+                        <ImageIcon className="h-4 w-4" />
+                        Cover
+                      </button>
+                      {coverImageFile ? (
+                        <p className="text-sm text-slate-300">
+                          Selected: {coverImageFile.name}{" "}
+                          <button className="font-semibold text-[#f4c2c2] hover:text-white" type="button" onClick={() => {
+                            setCoverImageFile(null);
+                            if (coverInputRef.current) coverInputRef.current.value = "";
+                          }}>
+                            clear
+                          </button>
+                        </p>
+                      ) : null}
+                    </div>
                     <select
                       className="w-full rounded-xl border border-white/10 bg-[#221a32] px-4 py-3 text-white"
                       value={deckForm.deckType}
@@ -854,7 +1209,7 @@ export function TarotDeckDetailPage({ user }) {
             </div>
           </>
         ) : null}
-      </div>
+      </TarotLibraryPageFrame>
     </TarotShell>
   );
 }
@@ -1040,6 +1395,14 @@ export function TarotCardEditorPage({ user }) {
 }
 
 export function TarotReadingPage({ user }) {
+  return (
+    <TarotShell user={user} wide>
+      <TarotReadingContent />
+    </TarotShell>
+  );
+}
+
+export function TarotReadingContent({ embedded = false, showResultPanel = true, onReadingComplete }) {
   const [decks, setDecks] = useState([]);
   const [deckId, setDeckId] = useState("");
   const [spreadType, setSpreadType] = useState("one_card");
@@ -1048,6 +1411,7 @@ export function TarotReadingPage({ user }) {
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
   const [drawing, setDrawing] = useState(false);
+  const selectedDeck = useMemo(() => decks.find((deck) => String(deck.id) === String(deckId)), [deckId, decks]);
 
   useEffect(() => {
     apiFetch("/api/tarot/decks/")
@@ -1063,6 +1427,10 @@ export function TarotReadingPage({ user }) {
     event.preventDefault();
     setError("");
     setResult(null);
+    if (!selectedDeck || Number(selectedDeck.cardCount ?? 0) < 2) {
+      window.alert("このデッキにはカードが2枚以上ありません。カードを追加してからシャッフルしてください。");
+      return;
+    }
     setDrawing(true);
     try {
       const reading = await apiFetch("/api/tarot/readings/draw/", {
@@ -1070,6 +1438,7 @@ export function TarotReadingPage({ user }) {
         body: JSON.stringify({ deckId: Number(deckId), spreadType, allowReversed, question, includeAi: true }),
       });
       setResult(reading);
+      onReadingComplete?.(reading);
     } catch (err) {
       setError(err.message || "Failed to draw cards.");
     } finally {
@@ -1078,37 +1447,78 @@ export function TarotReadingPage({ user }) {
   };
 
   return (
-    <TarotShell user={user} wide>
-      <div className="mx-auto grid max-w-7xl gap-5 lg:grid-cols-[360px_1fr]">
+      <div className={`${embedded ? "tarot-reading-embedded" : "mx-auto max-w-7xl"} grid gap-5 ${showResultPanel ? "lg:grid-cols-[360px_1fr]" : ""}`}>
         <Panel>
-          <p className="mb-2 text-sm uppercase tracking-[0.28em] text-[#f4c2c2]">Tarot / Draw</p>
-          <h1 className="text-3xl font-semibold text-white">Draw Cards</h1>
+          {!embedded ? (
+            <Link to="/bookdesign" state={{ bookSection: "tarot" }} className="mb-2 inline-flex items-center gap-2 text-sm uppercase tracking-[0.28em] text-[#f4c2c2] transition hover:text-white">
+              <ArrowLeft className="h-4 w-4" />
+              Tarot / Draw
+            </Link>
+          ) : (
+            null
+          )}
+          {!embedded ? <h1 className="text-3xl font-semibold text-white">Draw Cards</h1> : null}
           <ErrorNotice message={error} />
-          <form className="mt-6 space-y-4" onSubmit={draw}>
-            <select className="w-full rounded-xl border border-white/10 bg-[#221a32] px-4 py-3 text-white" value={deckId} onChange={(event) => setDeckId(event.target.value)}>
-              {decks.map((deck) => <option key={deck.id} value={deck.id}>{deck.name}</option>)}
-            </select>
+          <form className={`${embedded ? "mt-0 space-y-3" : "mt-6 space-y-4"}`} onSubmit={draw}>
+            <DeckPicker decks={decks} selectedDeckId={deckId} onSelect={setDeckId} compact={embedded} />
             <select className="w-full rounded-xl border border-white/10 bg-[#221a32] px-4 py-3 text-white" value={spreadType} onChange={(event) => setSpreadType(event.target.value)}>
               <option value="one_card">One card</option>
               <option value="three_card">Three cards</option>
             </select>
-            <textarea className="min-h-28 w-full rounded-xl border border-white/10 bg-white/8 px-4 py-3 text-white outline-none" placeholder="Question" value={question} onChange={(event) => setQuestion(event.target.value)} />
+            <textarea className={`${embedded ? "min-h-24" : "min-h-28"} w-full rounded-xl border border-white/10 bg-white/8 px-4 py-3 text-white outline-none`} placeholder="Question" value={question} onChange={(event) => setQuestion(event.target.value)} />
             <label className="flex items-center gap-3 text-sm text-slate-200">
               <input type="checkbox" checked={allowReversed} onChange={(event) => setAllowReversed(event.target.checked)} />
               Allow reversed cards
             </label>
-            <button className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#f4c2c2] px-5 py-3 font-semibold text-[#2a2036] disabled:cursor-wait disabled:opacity-70" type="submit" disabled={drawing}>
+            <button className="inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-full border border-[#f4c2c2]/55 bg-[#f4c2c2]/14 px-5 py-3 font-semibold text-[#ffe4ec] shadow-[0_10px_28px_rgba(244,194,194,0.14)] transition hover:-translate-y-0.5 hover:border-[#ffdbe6]/75 hover:bg-[#f4c2c2]/24 hover:shadow-[0_14px_34px_rgba(244,194,194,0.22)] disabled:cursor-wait disabled:opacity-70" type="submit" disabled={drawing}>
               <Sparkles className="h-4 w-4" /> {drawing ? "DRAWING..." : "DRAW AND SAVE"}
             </button>
           </form>
         </Panel>
-        <ReadingResult result={result} loading={drawing} />
+        {showResultPanel ? <ReadingResult result={result} loading={drawing} /> : null}
       </div>
-    </TarotShell>
   );
 }
 
-function ReadingResult({ result, loading = false }) {
+function DeckPicker({ decks, selectedDeckId, onSelect, compact = false }) {
+  if (!decks.length) {
+    return <p className="rounded-xl border border-white/10 bg-white/8 px-4 py-3 text-sm text-slate-200">Loading decks...</p>;
+  }
+
+  return (
+    <div>
+      <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-2 pt-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {decks.map((deck) => {
+          const selected = String(deck.id) === String(selectedDeckId);
+          return (
+            <button
+              key={deck.id}
+              type="button"
+              onClick={() => onSelect(String(deck.id))}
+              className={`${compact ? "min-w-[156px]" : "min-w-[148px]"} rounded-2xl border p-2 text-left transition hover:-translate-y-1 hover:bg-white/12 ${
+                selected ? "border-[#f4c2c2] bg-[#f4c2c2]/12 shadow-[0_0_0_1px_rgba(244,194,194,0.26)]" : "border-white/10 bg-white/7"
+              }`}
+            >
+              <span className="block aspect-[4/5] overflow-hidden rounded-xl border border-white/10 bg-[#241b34]">
+                {deckCoverImage(deck) ? (
+                  <img src={deckCoverImage(deck)} alt={`${deck.name} cover`} loading="lazy" decoding="async" className="h-full w-full object-cover" />
+                ) : (
+                  <span className="block h-full w-full">
+                    <TarotCardArt card={{ name: deck.name }} compact />
+                  </span>
+                )}
+              </span>
+              <span className="mt-2 block truncate text-sm font-semibold text-white">{deck.name}</span>
+              <span className="mt-1 block text-xs text-slate-400">{deck.cardCount} cards</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+export function ReadingResult({ result, loading = false, showHeader = true }) {
   if (loading) {
     return <Panel className="flex min-h-[420px] items-center justify-center text-center text-slate-300">Drawing cards and listening for the reading...</Panel>;
   }
@@ -1117,18 +1527,52 @@ function ReadingResult({ result, loading = false }) {
   }
   return (
     <Panel>
-      <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="text-sm uppercase tracking-[0.22em] text-[#f4c2c2]">{result.spreadType}</p>
-          <h2 className="mt-2 text-2xl font-semibold text-white">{result.question || "Untitled reading"}</h2>
+      {showHeader ? (
+        <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-sm uppercase tracking-[0.22em] text-[#f4c2c2]">{result.spreadType}</p>
+            <h2 className="mt-2 text-2xl font-semibold text-white">{result.question || "Untitled reading"}</h2>
+          </div>
+          <Link to={`/tarot/readings/${result.id}`} className="rounded-full border border-white/12 px-4 py-2 text-sm text-white">DETAIL</Link>
         </div>
-        <Link to={`/tarot/readings/${result.id}`} className="rounded-full border border-white/12 px-4 py-2 text-sm text-white">DETAIL</Link>
-      </div>
-      <div className="grid gap-4 md:grid-cols-3">
-        {result.cards.map((card) => (
-          <article key={card.position} className="rounded-xl border border-white/10 bg-white/7 p-4">
-            <div className={`mb-4 aspect-[3/4] overflow-hidden rounded-lg border border-white/10 bg-[#241b34] ${card.isReversed ? "rotate-180" : ""}`}>
+      ) : null}
+      <TarotReadingCards result={result} />
+      <p className="mt-5 text-sm text-slate-400">Remaining saved readings: {result.remaining}/{result.limit}</p>
+      <TarotReadingMessage result={result} />
+    </Panel>
+  );
+}
+
+export function TarotReadingCards({ result }) {
+  const [activeCardPosition, setActiveCardPosition] = useState(null);
+  if (!result) return null;
+  const isSingleCard = result.cards.length === 1;
+  const triggerCardReaction = (event, card) => {
+    event.currentTarget.blur();
+    setActiveCardPosition(card.position);
+    window.setTimeout(() => {
+      setActiveCardPosition((current) => (current === card.position ? null : current));
+    }, 760);
+  };
+
+  return (
+    <>
+      <style>{tarotReadingCardMotionStyles}</style>
+      <div className={`grid gap-4 ${isSingleCard ? "place-items-center" : "md:grid-cols-3"}`}>
+        {result.cards.map((card, index) => (
+          <article
+            key={card.position}
+            className={`tarot-reading-card-live cursor-pointer overflow-hidden rounded-xl border border-white/10 bg-white/7 p-4 ${activeCardPosition === card.position ? "tarot-reading-card-awake" : ""} ${isSingleCard ? "w-full max-w-[280px]" : ""}`}
+            onClick={(event) => triggerCardReaction(event, card)}
+            style={{ animationDelay: `${index * 160}ms` }}
+          >
+            <div className={`tarot-reading-card-face mb-4 aspect-[3/4] overflow-hidden rounded-lg border border-white/10 bg-[#241b34] ${card.isReversed ? "rotate-180" : ""}`}>
               <TarotCardArt card={{ ...card, image: card.image, name: card.cardName }} compact />
+              <span className="tarot-reading-card-shine" aria-hidden="true" />
+              <span className="tarot-reading-card-aura" aria-hidden="true" />
+              <span className="tarot-reading-card-spark tarot-reading-card-spark-one" aria-hidden="true" />
+              <span className="tarot-reading-card-spark tarot-reading-card-spark-two" aria-hidden="true" />
+              <span className="tarot-reading-card-spark tarot-reading-card-spark-three" aria-hidden="true" />
             </div>
             <p className="text-xs uppercase tracking-[0.2em] text-slate-400">{card.positionLabel}</p>
             <h3 className="mt-3 text-lg font-semibold text-white">{card.cardName}</h3>
@@ -1137,75 +1581,219 @@ function ReadingResult({ result, loading = false }) {
           </article>
         ))}
       </div>
-      <p className="mt-5 text-sm text-slate-400">Remaining saved readings: {result.remaining}/{result.limit}</p>
-      {result.aiInterpretation ? (
-        <div className="mt-4 rounded-2xl border border-[#f4c2c2]/20 bg-[#f4c2c2]/8 p-5">
-          <p className="text-xs uppercase tracking-[0.24em] text-[#f4c2c2]">Witch's Reading</p>
-          <div className="mt-3 whitespace-pre-line text-sm leading-8 text-slate-100">{result.aiInterpretation}</div>
-        </div>
-      ) : null}
-    </Panel>
+    </>
   );
 }
 
-export function TarotReadingHistoryPage({ user }) {
-  const [data, setData] = useState(null);
-  const [error, setError] = useState("");
-  const loadReadings = () => apiFetch("/api/tarot/readings/").then(setData).catch((err) => setError(err.message || "Failed to load readings."));
-  useEffect(() => { loadReadings(); }, []);
+const tarotReadingCardMotionStyles = `
+  .tarot-reading-card-live {
+    position: relative;
+    animation: tarotReadingCardFloat 5.8s ease-in-out infinite;
+    box-shadow: 0 14px 34px rgba(0,0,0,0.22), 0 0 22px rgba(244,194,194,0.08);
+  }
 
-  const patchReading = async (reading, patch) => {
-    await apiFetch(`/api/tarot/readings/${reading.id}/`, { method: "PATCH", body: JSON.stringify(patch) });
-    loadReadings();
-  };
-  const deleteReading = async (reading) => {
-    await apiFetch(`/api/tarot/readings/${reading.id}/`, { method: "DELETE" });
-    loadReadings();
-  };
+  .tarot-reading-card-live:active {
+    transform: translateY(-2px) scale(0.99);
+  }
+
+  .tarot-reading-card-awake {
+    animation: tarotReadingCardAwake 760ms ease-out both, tarotReadingCardFloat 5.8s ease-in-out infinite 760ms;
+    border-color: rgba(255,232,246,0.34);
+  }
+
+  .tarot-reading-card-face {
+    position: relative;
+    isolation: isolate;
+    box-shadow: 0 0 22px rgba(216,196,255,0.18), inset 0 0 18px rgba(255,255,255,0.06);
+  }
+
+  .tarot-reading-card-shine {
+    position: absolute;
+    inset: -35%;
+    z-index: 2;
+    pointer-events: none;
+    background: linear-gradient(115deg, transparent 30%, rgba(255,255,255,0.34) 45%, rgba(244,194,194,0.18) 50%, transparent 64%);
+    mix-blend-mode: screen;
+    transform: translateX(-72%) rotate(8deg);
+    animation: tarotReadingCardShine 4.2s ease-in-out infinite;
+  }
+
+  .tarot-reading-card-aura {
+    position: absolute;
+    inset: 6%;
+    z-index: 2;
+    border-radius: 16px;
+    pointer-events: none;
+    opacity: 0;
+    background:
+      radial-gradient(circle at 50% 46%, rgba(255,255,255,0.36), transparent 28%),
+      radial-gradient(circle at 50% 50%, rgba(244,194,194,0.26), transparent 58%);
+    box-shadow:
+      0 0 28px rgba(255,255,255,0.34),
+      0 0 48px rgba(244,194,194,0.34),
+      inset 0 0 26px rgba(255,255,255,0.18);
+    mix-blend-mode: screen;
+  }
+
+  .tarot-reading-card-awake .tarot-reading-card-face {
+    animation: tarotReadingCardFaceAwake 760ms ease-out both;
+  }
+
+  .tarot-reading-card-awake .tarot-reading-card-aura {
+    animation: tarotReadingCardAuraAwake 760ms ease-out both;
+  }
+
+  .tarot-reading-card-awake .tarot-reading-card-shine {
+    animation: tarotReadingCardShineAwake 760ms ease-out both, tarotReadingCardShine 4.2s ease-in-out infinite 760ms;
+  }
+
+  .tarot-reading-card-spark {
+    position: absolute;
+    z-index: 3;
+    width: 7px;
+    height: 7px;
+    border-radius: 999px;
+    pointer-events: none;
+    background: rgba(255,255,255,0.9);
+    box-shadow: 0 0 10px rgba(255,255,255,0.85), 0 0 18px rgba(244,194,194,0.48);
+    animation: tarotReadingCardSpark 2.8s ease-in-out infinite;
+  }
+
+  .tarot-reading-card-spark-one {
+    left: 18%;
+    top: 22%;
+  }
+
+  .tarot-reading-card-spark-two {
+    right: 19%;
+    top: 44%;
+    animation-delay: 720ms;
+  }
+
+  .tarot-reading-card-spark-three {
+    left: 48%;
+    bottom: 16%;
+    animation-delay: 1380ms;
+  }
+
+  @keyframes tarotReadingCardFloat {
+    0%, 100% {
+      transform: translateY(0);
+      filter: brightness(1);
+    }
+    50% {
+      transform: translateY(-5px);
+      filter: brightness(1.06);
+    }
+  }
+
+  @keyframes tarotReadingCardAwake {
+    0% {
+      transform: translateY(0) scale(1) rotate(0deg);
+      box-shadow: 0 14px 34px rgba(0,0,0,0.22), 0 0 22px rgba(244,194,194,0.08);
+    }
+    28% {
+      transform: translateY(-7px) scale(1.025) rotate(-0.8deg);
+      box-shadow: 0 18px 42px rgba(0,0,0,0.26), 0 0 42px rgba(244,194,194,0.34), 0 0 58px rgba(216,196,255,0.22);
+    }
+    52% {
+      transform: translateY(-4px) scale(1.012) rotate(0.7deg);
+    }
+    100% {
+      transform: translateY(0) scale(1) rotate(0deg);
+      box-shadow: 0 14px 34px rgba(0,0,0,0.22), 0 0 22px rgba(244,194,194,0.08);
+    }
+  }
+
+  @keyframes tarotReadingCardFaceAwake {
+    0%, 100% {
+      filter: brightness(1) saturate(1);
+    }
+    34% {
+      filter: brightness(1.22) saturate(1.18);
+    }
+  }
+
+  @keyframes tarotReadingCardAuraAwake {
+    0% {
+      opacity: 0;
+      transform: scale(0.82);
+    }
+    32% {
+      opacity: 0.95;
+      transform: scale(1.02);
+    }
+    100% {
+      opacity: 0;
+      transform: scale(1.18);
+    }
+  }
+
+  @keyframes tarotReadingCardShineAwake {
+    0% {
+      opacity: 0;
+      transform: translateX(-86%) rotate(8deg);
+    }
+    38% {
+      opacity: 1;
+    }
+    100% {
+      opacity: 0;
+      transform: translateX(86%) rotate(8deg);
+    }
+  }
+
+  @keyframes tarotReadingCardShine {
+    0%, 46% {
+      opacity: 0;
+      transform: translateX(-72%) rotate(8deg);
+    }
+    58% {
+      opacity: 0.9;
+    }
+    82%, 100% {
+      opacity: 0;
+      transform: translateX(72%) rotate(8deg);
+    }
+  }
+
+  @keyframes tarotReadingCardSpark {
+    0%, 100% {
+      opacity: 0.18;
+      transform: scale(0.65);
+    }
+    42% {
+      opacity: 1;
+      transform: scale(1.18);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .tarot-reading-card-live,
+    .tarot-reading-card-shine,
+    .tarot-reading-card-spark,
+    .tarot-reading-card-aura,
+    .tarot-reading-card-awake,
+    .tarot-reading-card-awake .tarot-reading-card-face {
+      animation: none;
+    }
+  }
+`;
+
+export function TarotReadingMessage({ result }) {
+  if (!result?.aiInterpretation) return null;
 
   return (
-    <TarotShell user={user} wide>
-      <div className="mx-auto max-w-6xl">
-        <div className="mb-6 flex items-end justify-between gap-4">
-          <div>
-            <p className="mb-2 text-sm uppercase tracking-[0.28em] text-[#f4c2c2]">Tarot / Saved</p>
-            <h1 className="text-3xl font-semibold text-white">Reading History</h1>
-          </div>
-          <Link to="/tarot/read" className="rounded-full bg-[#f4c2c2] px-5 py-3 font-semibold text-[#2a2036]">DRAW</Link>
-        </div>
-        <ErrorNotice message={error} />
-        {!data ? <LoadingNotice /> : null}
-        {data ? (
-          <div className="space-y-4">
-            <p className="text-sm text-slate-400">Remaining saved readings: {data.remaining}/{data.limit}</p>
-            {data.readings.map((reading) => (
-              <Panel key={reading.id}>
-                <div className="flex flex-wrap items-start justify-between gap-4">
-                  <Link to={`/tarot/readings/${reading.id}`} className="min-w-0 flex-1">
-                    <p className="text-xs uppercase tracking-[0.22em] text-slate-400">{new Date(reading.createdAt).toLocaleString()}</p>
-                    <h2 className="mt-2 text-xl font-semibold text-white">{reading.question || "Untitled reading"}</h2>
-                    <p className="mt-2 text-sm text-slate-300">{reading.cards.map((card) => card.cardName).join(" / ")}</p>
-                  </Link>
-                  <div className="flex gap-2">
-                    <button type="button" onClick={() => patchReading(reading, { isPinned: !reading.isPinned })} className={`rounded-full border px-3 py-2 ${reading.isPinned ? "border-[#f4c2c2] bg-[#f4c2c2] text-[#2a2036]" : "border-white/12 text-white"}`}>
-                      <Star className="h-4 w-4" />
-                    </button>
-                    <button type="button" onClick={() => deleteReading(reading)} className="rounded-full border border-white/12 px-3 py-2 text-white">
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-                </div>
-              </Panel>
-            ))}
-          </div>
-        ) : null}
-      </div>
-    </TarotShell>
+    <div className="mt-4 rounded-2xl border border-[#f4c2c2]/20 bg-[#f4c2c2]/8 p-5">
+      <p className="text-xs uppercase tracking-[0.24em] text-[#f4c2c2]">Witch's Reading</p>
+      <div className="mt-3 whitespace-pre-line text-sm leading-8 text-slate-100">{result.aiInterpretation}</div>
+    </div>
   );
 }
 
 export function TarotReadingDetailPage({ user }) {
   const { readingId } = useParams();
+  const navigate = useNavigate();
   const [reading, setReading] = useState(null);
   const [memo, setMemo] = useState("");
   const [error, setError] = useState("");
@@ -1223,6 +1811,16 @@ export function TarotReadingDetailPage({ user }) {
     setReading(updated);
   };
 
+  const backToDiaryList = () => {
+    navigate("/bookdesign", {
+      state: {
+        bookSection: "diary",
+        diaryPage: "list",
+        selectedDate: dateKeyFromTimestamp(reading?.createdAt),
+      },
+    });
+  };
+
   return (
     <TarotShell user={user} wide>
       <div className="mx-auto max-w-5xl">
@@ -1235,11 +1833,16 @@ export function TarotReadingDetailPage({ user }) {
                 <p className="text-sm uppercase tracking-[0.22em] text-[#f4c2c2]">{reading.spreadType}</p>
                 <h1 className="mt-2 text-3xl font-semibold text-white">{reading.question || "Untitled reading"}</h1>
               </div>
-              <button type="button" className="rounded-full border border-white/12 px-4 py-2 text-white" onClick={async () => setReading(await apiFetch(`/api/tarot/readings/${reading.id}/`, { method: "PATCH", body: JSON.stringify({ isPinned: !reading.isPinned }) }))}>
-                <Star className={`h-4 w-4 ${reading.isPinned ? "fill-[#f4c2c2] text-[#f4c2c2]" : ""}`} />
-              </button>
+              <div className="flex flex-wrap gap-2">
+                <button type="button" className="cursor-pointer rounded-full border border-white/12 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/10" onClick={backToDiaryList}>
+                  BACK TO DIARY LIST
+                </button>
+                <button type="button" className="rounded-full border border-white/12 px-4 py-2 text-white" onClick={async () => setReading(await apiFetch(`/api/tarot/readings/${reading.id}/`, { method: "PATCH", body: JSON.stringify({ isPinned: !reading.isPinned }) }))}>
+                  <Star className={`h-4 w-4 ${reading.isPinned ? "fill-[#f4c2c2] text-[#f4c2c2]" : ""}`} />
+                </button>
+              </div>
             </div>
-            <ReadingResult result={reading} />
+            <ReadingResult result={reading} showHeader={false} />
             <div className="mt-5">
               <label className="mb-2 block text-sm text-slate-300">Memo</label>
               <textarea className="min-h-32 w-full rounded-xl border border-white/10 bg-white/8 px-4 py-3 text-white outline-none" value={memo} onChange={(event) => setMemo(event.target.value)} />

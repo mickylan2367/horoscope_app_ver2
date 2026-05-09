@@ -281,7 +281,7 @@ def build_tarot_ai_payload(reading):
 
 
 def generate_ai_tarot_interpretation(tarot_payload):
-    cache_key = make_ai_cache_key("tarot_reading", tarot_payload)
+    cache_key = make_ai_cache_key("tarot_reading_v3", tarot_payload)
     cached = cache.get(cache_key)
     if cached:
         return cached
@@ -293,16 +293,54 @@ def generate_ai_tarot_interpretation(tarot_payload):
 大切な姿勢:
 - 相談者のつらさや迷いには寄り添う。ただし、根拠なく「大丈夫」「必ず良くなる」とは言わない。
 - カードが停滞、拒絶、終わり、未練、危険、損失、関係の不均衡を示す場合は、やわらかくぼかしすぎず、はっきり告げる。
+- 良いカード、回復や発展を示すカード、正位置で力が出ているカードがある場合は、その象徴から「どんな良い未来が起こりそうか」を具体的な出来事として描く。例: 連絡が来る、誤解がほどける、協力者が現れる、仕事の評価が上がる、気持ちが前向きに戻る、次の約束が決まるなど。
+- 良い流れは、抽象的な励ましだけで終わらせない。カード名、位置、向き、意味を根拠にして、相談者が想像しやすい未来の場面へ紡ぐ。
+- ただし、未来を断定しすぎない。「〜になりそう」「〜の兆しがあります」「〜へ進みやすい流れです」のように、占いとして自然な余白を残す。
 - 怖がらせる断定や脅しは避ける。占いは決定ではなく、今見えている流れとして伝える。
 - 恋愛・仕事・人間関係の悩みに対して、相手の気持ちを断定しすぎず、相談者が次に取れる現実的な一歩を示す。
 - 医療、法律、金銭の重大判断は専門家への相談を促す。
 
 出力形式:
 1. まず2〜3文で、全体の流れを魔女らしい静かな語り口で伝える。
-2. 次に、カードごとの意味を短く読む。
-3. 最後に「今夜の助言」として、相談者が今日か明日にできる具体的な行動を1〜3個示す。
+2. 良いカードがある場合は、全体の流れの中に「近い未来に起こりそうな良い具体的事象」を1〜2個入れる。
+3. 次に、カードごとの意味を短く読む。
+4. 最後に「今夜の助言」として、相談者が今日か明日にできる具体的な行動を1〜3個示す。
 
 長さは500〜900字程度。
+
+データ:
+{json.dumps(tarot_payload, ensure_ascii=False, indent=2)}
+""".strip()
+    prompt = f"""
+あなたは、夜の小さな相談室にいる「怖くないタロット読み」です。
+相談者の悩みと引かれたカードをもとに、日本語でやさしく深掘りした解釈を書いてください。
+
+大切な姿勢:
+- 相談者を怖がらせない。責めない。突き放さない。
+- つらさ、迷い、不安がある場合は、まずその気持ちに寄り添う。
+- ただし根拠なく「大丈夫」「必ず良くなる」とは言わない。カード名、位置、向き、意味を根拠にする。
+- 厳しいカード、停滞、終わり、未練、不安定さ、関係のすれ違いを示すカードがある場合も、やわらかく現実的に伝える。
+- 悪いカードは「終わり」ではなく、「注意点」「回復の入口」「自分を守るヒント」として読む。
+- 良いカード、回復や発展を示すカード、正位置で力が出ているカードがある場合は、その象徴から「近い未来に起こりそうな良い具体的事象」を1〜2個入れる。
+  例: 連絡が来る、誤解がほどける、協力者が現れる、仕事の評価が上がる、気持ちが前向きに戻る、次の約束が決まる、安心できる会話が生まれる。
+- 良い流れは、抽象的な励ましだけで終わらせない。相談者が想像しやすい未来の場面として紡ぐ。
+- 未来は断定しすぎない。「〜になりそう」「〜の兆しがあります」「〜へ進みやすい流れです」のように、占いとして自然な余白を残す。
+- 相手の気持ちを読む場合も断定しすぎず、「そう見えます」「その可能性があります」と表現する。
+- 相談者がやりたいこと、進みたい方向が質問に含まれている場合は、危険を煽らず、その気持ちを後押しする。
+- 迷っている、動けない、まだ決めたくない相談者には、「今のまま様子を見る」「無理に動かない」選択も肯定する。
+- 医療、法律、投資など重大判断は、専門家への相談を促す。
+
+出力形式:
+1. まず1〜2文で、全体の流れを親しみやすく伝える。
+2. 次に、カードごとの意味を短く深掘りする。
+3. 良いカードや回復の兆しがある場合は、近い未来に起こりそうな具体的な良い出来事を1〜2個入れる。
+4. 最後に「今日からできる小さな行動」を1〜2個、具体的に提案する。
+
+文体:
+- やさしく、親しみやすく、少し明るい。
+- ポップすぎず、落ち着いた相談室のように。
+- 相談者を置いていかない。
+- 500〜800字程度。
 
 データ:
 {json.dumps(tarot_payload, ensure_ascii=False, indent=2)}
@@ -914,12 +952,20 @@ def _card_image_value(card):
     return card.image_url
 
 
+def _deck_cover_value(deck):
+    if deck.cover_image:
+        return deck.cover_image.url
+    return deck.cover_image_url
+
+
 def _tarot_deck_payload(deck):
     return {
         "id": deck.pk,
         "name": deck.name,
         "slug": deck.slug,
         "description": deck.description,
+        "coverImage": _deck_cover_value(deck),
+        "cover_image": _deck_cover_value(deck),
         "deckType": deck.deck_type,
         "deck_type": deck.deck_type,
         "isSystem": deck.is_system,
@@ -1025,6 +1071,16 @@ def _tarot_request_data(request):
     return _json_body(request)
 
 
+def _coerce_bool(value, default=False):
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() in {"1", "true", "yes", "on"}
+    return bool(value)
+
+
 def _tarot_image_error(image):
     if not image:
         return ""
@@ -1083,9 +1139,13 @@ def api_tarot_decks(request):
     if auth_error:
         return auth_error
     try:
-        data = _json_body(request)
+        data = _tarot_request_data(request)
     except ValueError as exc:
         return JsonResponse({"error": str(exc)}, status=400)
+
+    cover_error = _tarot_image_error(request.FILES.get("coverImageFile"))
+    if cover_error:
+        return JsonResponse({"error": cover_error}, status=400)
 
     name = str(data.get("name", "")).strip()
     if not name:
@@ -1099,10 +1159,15 @@ def api_tarot_decks(request):
         user=request.user,
         name=name,
         description=str(data.get("description", "")),
+        cover_image_url=str(data.get("coverImage", data.get("cover_image", "")) or ""),
         deck_type=deck_type,
-        is_public=bool(data.get("isPublic", data.get("is_public", False))),
-        allow_reversed=bool(data.get("allowReversed", data.get("allow_reversed", deck_type == TarotDeck.DECK_TYPE_TAROT))),
+        is_public=_coerce_bool(data.get("isPublic", data.get("is_public")), False),
+        allow_reversed=_coerce_bool(data.get("allowReversed", data.get("allow_reversed")), deck_type == TarotDeck.DECK_TYPE_TAROT),
     )
+    if request.FILES.get("coverImageFile"):
+        deck.cover_image = request.FILES["coverImageFile"]
+        deck.cover_image_url = ""
+        deck.save(update_fields=["cover_image", "cover_image_url", "updated_at"])
     return JsonResponse(_tarot_deck_payload(deck), status=201)
 
 
@@ -1124,18 +1189,29 @@ def api_tarot_deck_detail(request, pk):
         return JsonResponse({"ok": True})
 
     try:
-        data = _json_body(request)
+        data = _tarot_request_data(request)
     except ValueError as exc:
         return JsonResponse({"error": str(exc)}, status=400)
 
+    cover_error = _tarot_image_error(request.FILES.get("coverImageFile"))
+    if cover_error:
+        return JsonResponse({"error": cover_error}, status=400)
+
     deck.name = str(data.get("name", deck.name)).strip() or deck.name
     deck.description = str(data.get("description", deck.description))
+    if "coverImage" in data or "cover_image" in data:
+        deck.cover_image_url = str(data.get("coverImage", data.get("cover_image", deck.cover_image_url)) or "")
+        if deck.cover_image_url:
+            deck.cover_image = ""
     deck_type = data.get("deckType") or data.get("deck_type") or deck.deck_type
     if deck_type not in {TarotDeck.DECK_TYPE_TAROT, TarotDeck.DECK_TYPE_ORACLE}:
         return JsonResponse({"error": "deckType must be tarot or oracle"}, status=400)
     deck.deck_type = deck_type
-    deck.is_public = bool(data.get("isPublic", data.get("is_public", deck.is_public)))
-    deck.allow_reversed = bool(data.get("allowReversed", data.get("allow_reversed", deck.allow_reversed)))
+    deck.is_public = _coerce_bool(data.get("isPublic", data.get("is_public")), deck.is_public)
+    deck.allow_reversed = _coerce_bool(data.get("allowReversed", data.get("allow_reversed")), deck.allow_reversed)
+    if request.FILES.get("coverImageFile"):
+        deck.cover_image = request.FILES["coverImageFile"]
+        deck.cover_image_url = ""
     deck.save()
     return JsonResponse(_tarot_deck_payload(deck))
 

@@ -4,20 +4,23 @@ function DiaryCard({ diary, isActive = false, cardRef, deferImages = false, onOp
   const [selectedImage, setSelectedImage] = useState(null);
   const visibleImages = useMemo(() => diary.images?.slice(0, 3) ?? [], [diary.images]);
   const hiddenCount = Math.max((diary.images?.length ?? 0) - visibleImages.length, 0);
+  const isTarot = diary.sourceType === "tarot";
 
   return (
     <article
       ref={cardRef}
       role="button"
       tabIndex={0}
-      onClick={() => onOpenEdit?.(diary.id)}
+      onClick={() => onOpenEdit?.(diary)}
       onKeyDown={(event) => {
         if (event.key === "Enter" || event.key === " ") {
           event.preventDefault();
-          onOpenEdit?.(diary.id);
+          onOpenEdit?.(diary);
         }
       }}
       className={`mb-6 scroll-mt-6 rounded-2xl border border-white/8 bg-[#31385d]/92 p-6 text-inherit shadow-[0_12px_30px_rgba(0,0,0,0.18)] backdrop-blur-sm transition hover:-translate-y-0.5 hover:bg-[#383f66]/95 hover:shadow-[0_16px_34px_rgba(0,0,0,0.22)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#f4c2c2] ${
+        isTarot ? "cursor-pointer" : ""
+      } ${
         isActive ? "ring-2 ring-[#f4c2c2] ring-offset-4 ring-offset-[#070b17]/40" : ""
       }`}
       style={{
@@ -32,6 +35,11 @@ function DiaryCard({ diary, isActive = false, cardRef, deferImages = false, onOp
               <p className="mt-2 text-sm text-slate-200">{diary.title}</p>
             ) : null}
           </div>
+          {isTarot ? (
+            <span className="rounded-full border border-[#f4c2c2]/30 bg-[#f4c2c2]/12 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-[#ffdbe3]">
+              Tarot
+            </span>
+          ) : null}
         </div>
 
         <div

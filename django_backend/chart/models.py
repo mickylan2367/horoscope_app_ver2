@@ -75,6 +75,8 @@ class TarotDeck(models.Model):
     slug = models.SlugField(max_length=140, blank=True)
     description = models.TextField(blank=True)
     deck_type = models.CharField(max_length=20, choices=DECK_TYPE_CHOICES, default=DECK_TYPE_TAROT)
+    cover_image = models.ImageField(upload_to="tarot_decks/%Y/%m/", blank=True)
+    cover_image_url = models.CharField(max_length=500, blank=True)
     is_system = models.BooleanField(default=False, db_index=True)
     is_public = models.BooleanField(default=False, db_default=False, db_index=True)
     allow_reversed = models.BooleanField(default=True)

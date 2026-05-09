@@ -3,18 +3,67 @@ import { AnimatePresence, motion as Motion } from "framer-motion";
 import { ArrowLeft, ArrowRight, Save } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import CosmicBackground from "../components/CosmicBackground";
+import StarrySky from "../components/StarrySky.jsx";
 import CalendarCard from "../components/CalendarCard";
 import DiaryCard from "../components/DiaryCard";
 import DiaryEditorForm from "../components/DiaryEditorForm";
 import { apiFetch } from "../api";
 
-const seededRandom = (seed) => {
-  const x = Math.sin(seed) * 10000;
-  return x - Math.floor(x);
-};
-
 const DIARY_PAGE_SIZE = 12;
 const DIARY_IMAGE_REVEAL_DELAY_MS = 220;
+const DIARY_PAGE_TRANSITION_MS = 460;
+const diaryPageBlurMotion = {
+  initial: { opacity: 0, filter: "blur(12px)", scale: 0.985 },
+  animate: { opacity: 1, filter: "blur(0px)", scale: 1 },
+  exit: { opacity: 0, filter: "blur(12px)", scale: 0.985 },
+  transition: { duration: 0.46, ease: "easeInOut" },
+};
+
+const escapeHtml = (value = "") =>
+  String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+
+const dateKeyFromTimestamp = (value) => {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "";
+  const year = parsed.getFullYear();
+  const month = String(parsed.getMonth() + 1).padStart(2, "0");
+  const day = String(parsed.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const tarotReadingToDiaryEntry = (reading) => {
+  const date = dateKeyFromTimestamp(reading.createdAt ?? reading.created_at);
+  const cardNames = reading.cards?.map((card) => card.cardName ?? card.card_name).filter(Boolean) ?? [];
+  const question = reading.question || "Untitled reading";
+  const interpretation = reading.aiInterpretation || reading.ai_interpretation || "";
+  const memo = reading.memo || "";
+  const cardList = cardNames.length ? cardNames.join(" / ") : "No cards recorded";
+  const renderedContent = `
+    <p><strong>Tarot Reading</strong></p>
+    <p>${escapeHtml(question)}</p>
+    <p><small>${escapeHtml(cardList)}</small></p>
+    ${interpretation ? `<p>${escapeHtml(interpretation).replace(/\n/g, "<br />")}</p>` : ""}
+    ${memo ? `<p><strong>Memo</strong><br />${escapeHtml(memo).replace(/\n/g, "<br />")}</p>` : ""}
+  `;
+
+  return {
+    id: `tarot-${reading.id}`,
+    sourceType: "tarot",
+    tarotReadingId: reading.id,
+    date,
+    sortDateTime: reading.createdAt ?? reading.created_at ?? date,
+    title: `Tarot: ${question}`,
+    renderedContent,
+    rendered_content: renderedContent,
+    images: [],
+    cards: reading.cards ?? [],
+  };
+};
 
 export default function DiaryBookPage({
   authReady = true,
@@ -23,9 +72,32 @@ export default function DiaryBookPage({
   forceEditor = false,
   initialPageIndex = 0,
 }) {
+  return (
+    <DiaryBookContent
+      authReady={authReady}
+      diaryId={diaryId}
+      isEdit={isEdit}
+      forceEditor={forceEditor}
+      initialPageIndex={initialPageIndex}
+    />
+  );
+}
+
+export function DiaryBookContent({
+  authReady = true,
+  diaryId = null,
+  isEdit = false,
+  forceEditor = false,
+  initialPageIndex = 0,
+  initialSelectedDate = "",
+  embedded = false,
+  onExitToBook,
+  onPageStateChange,
+  onOpenTarotReading,
+}) {
   const navigate = useNavigate();
   const location = useLocation();
-  const selectedDateFromState = location.state?.selectedDate ?? "";
+  const selectedDateFromState = embedded ? initialSelectedDate : location.state?.selectedDate ?? "";
   const [diaries, setDiaries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -48,28 +120,22 @@ export default function DiaryBookPage({
   const selectedDiaryRef = useRef(null);
   const editorTransitionTimerRef = useRef(null);
 
-  const starStyles = useMemo(
-    () =>
-      Array.from({ length: 110 }, (_, i) => {
-        const size = seededRandom(i + 1) * 3.5 + 1.2;
-        return {
-          width: `${size}px`,
-          height: `${size}px`,
-          top: `${seededRandom(i + 201) * 100}%`,
-          left: `${seededRandom(i + 401) * 100}%`,
-          opacity: seededRandom(i + 601) * 0.7 + 0.2,
-          boxShadow:
-            "0 0 8px rgba(255,255,255,0.95), 0 0 18px rgba(180,210,255,0.55), 0 0 28px rgba(181,120,255,0.25)",
-          animationDuration: `${seededRandom(i + 801) * 4 + 3}s`,
-          animationDelay: `${seededRandom(i + 1001) * 4}s`,
-        };
-      }),
-    [],
-  );
-
   useEffect(() => {
-    apiFetch("/api/diaries/")
-      .then((data) => setDiaries(Array.isArray(data) ? data : []))
+    Promise.all([
+      apiFetch("/api/diaries/"),
+      apiFetch("/api/tarot/readings/")
+        .then((data) => data.readings ?? [])
+        .catch(() => []),
+    ])
+      .then(([diaryData, tarotReadings]) => {
+        const diaryEntries = Array.isArray(diaryData)
+          ? diaryData.map((diary) => ({ ...diary, sourceType: "diary", sortDateTime: diary.date }))
+          : [];
+        const tarotEntries = tarotReadings
+          .map(tarotReadingToDiaryEntry)
+          .filter((entry) => entry.date);
+        setDiaries([...diaryEntries, ...tarotEntries]);
+      })
       .catch((err) => setError(err.message || "Failed to load diaries."))
       .finally(() => setLoading(false));
   }, []);
@@ -78,20 +144,24 @@ export default function DiaryBookPage({
     if (!pageTransition || pageIndex !== pageTransition.targetPageIndex) return undefined;
 
     const timeoutId = window.setTimeout(() => {
-      navigate(pageTransition.route, pageTransition.state);
+      if (!embedded) {
+        navigate(pageTransition.route, pageTransition.state);
+      }
       setPageTransition(null);
-    }, 520);
+    }, DIARY_PAGE_TRANSITION_MS);
 
     return () => {
       window.clearTimeout(timeoutId);
     };
-  }, [navigate, pageIndex, pageTransition]);
+  }, [embedded, navigate, pageIndex, pageTransition]);
 
   useEffect(() => {
     if (!editorTransition || pageIndex !== 2) return undefined;
+    if (embedded) return undefined;
+
     editorTransitionTimerRef.current = window.setTimeout(() => {
       navigate(editorTransition.route, selectedDate ? { state: { selectedDate } } : undefined);
-    }, 520);
+    }, DIARY_PAGE_TRANSITION_MS);
 
     return () => {
       if (editorTransitionTimerRef.current) {
@@ -99,7 +169,7 @@ export default function DiaryBookPage({
         editorTransitionTimerRef.current = null;
       }
     };
-  }, [editorTransition, navigate, pageIndex, selectedDate]);
+  }, [editorTransition, embedded, navigate, pageIndex, selectedDate]);
 
   useEffect(() => {
     if (pageIndex !== 1 || loading || error) return undefined;
@@ -114,12 +184,35 @@ export default function DiaryBookPage({
   }, [error, loading, pageIndex]);
 
   const diaryDates = useMemo(
-    () => [...new Set(diaries.map((diary) => diary.date).filter(Boolean))],
+    () => [...new Set(diaries.filter((diary) => diary.sourceType === "diary").map((diary) => diary.date).filter(Boolean))],
     [diaries],
   );
-
+  const tarotOnlyDates = useMemo(
+    () => {
+      const diaryDateSet = new Set(diaryDates);
+      return [...new Set(diaries
+        .filter((diary) => diary.sourceType === "tarot" && diary.date && !diaryDateSet.has(diary.date))
+        .map((diary) => diary.date))];
+    },
+    [diaries, diaryDates],
+  );
+  const calendarMarkedDates = useMemo(
+    () => [...new Set([...diaryDates, ...tarotOnlyDates])],
+    [diaryDates, tarotOnlyDates],
+  );
+  const calendarMarkerTypes = useMemo(
+    () => ({
+      diaryDates,
+      tarotOnlyDates,
+    }),
+    [diaryDates, tarotOnlyDates],
+  );
   const sortedDiaries = useMemo(() => {
-    return diaries;
+    return [...diaries].sort((left, right) => {
+      const rightTime = new Date(right.sortDateTime || right.date || 0).getTime();
+      const leftTime = new Date(left.sortDateTime || left.date || 0).getTime();
+      return rightTime - leftTime;
+    });
   }, [diaries]);
   const scrollTargetDiaryIndex = useMemo(() => {
     if (!selectedDate) return -1;
@@ -190,13 +283,13 @@ export default function DiaryBookPage({
   const editorFormId = "diary-editor-form";
 
   const goToBookIntro = useCallback(() => {
-    navigate("/diary/warp", {
-      state: {
-        target: "/bookdesign",
-        targetState: { page: 1 },
-      },
-    });
-  }, [navigate]);
+    if (embedded) {
+      onExitToBook?.();
+      return;
+    }
+
+    navigate("/bookdesign", { state: { page: 1 } });
+  }, [embedded, navigate, onExitToBook]);
 
   const handleBackToList = useCallback(() => {
     setListImagesReady(false);
@@ -240,11 +333,11 @@ export default function DiaryBookPage({
     setNotice("");
     setSelectedDate(date);
     setListImagesReady(false);
-    const exactIndex = diaries.findIndex((diary) => diary.date === date);
+    const exactIndex = sortedDiaries.findIndex((diary) => diary.date === date);
     const targetIndex =
       exactIndex >= 0
         ? exactIndex
-        : diaries.findIndex((diary) => diary.date && diary.date <= date);
+        : sortedDiaries.findIndex((diary) => diary.date && diary.date <= date);
     setVisibleDiaryCount(targetIndex >= 0 ? Math.max(DIARY_PAGE_SIZE, targetIndex + DIARY_PAGE_SIZE) : DIARY_PAGE_SIZE);
     setPageTransition({
       route: "/diary/list",
@@ -252,7 +345,7 @@ export default function DiaryBookPage({
       state: { selectedDate: date },
     });
     setPageIndex(1);
-  }, [diaries]);
+  }, [sortedDiaries]);
 
   const handleChangeMonth = useCallback((offset) => {
     setNotice("");
@@ -266,57 +359,75 @@ export default function DiaryBookPage({
   const handleSaved = useCallback((savedDiary) => {
     const nextDate = savedDiary?.date || selectedDate || "";
     if (nextDate) {
+      setSelectedDate(nextDate);
+    }
+    setListImagesReady(false);
+    setEditorTransition(null);
+    setPageTransition({
+      route: "/diary/list",
+      targetPageIndex: 1,
+      state: nextDate ? { selectedDate: nextDate } : undefined,
+    });
+    setPageIndex(1);
+
+    if (embedded) {
+      return;
+    }
+
+    if (nextDate) {
       navigate("/diary/list", { state: { selectedDate: nextDate } });
       return;
     }
     navigate("/diary/list");
-  }, [navigate, selectedDate]);
+  }, [embedded, navigate, selectedDate]);
 
-  const handleCardOpen = useCallback((targetDiaryId) => {
-    goToEditor(`/diary/${targetDiaryId}/edit`, targetDiaryId);
-  }, [goToEditor]);
+  const handleCardOpen = useCallback((entry) => {
+    if (entry?.sourceType === "tarot") {
+      if (embedded && onOpenTarotReading) {
+        onOpenTarotReading(entry);
+        return;
+      }
+      navigate(`/tarot/readings/${entry.tarotReadingId}`);
+      return;
+    }
+    goToEditor(`/diary/${entry.id}/edit`, entry.id);
+  }, [embedded, goToEditor, navigate, onOpenTarotReading]);
 
   const showMoreDiaries = useCallback(() => {
     setVisibleDiaryCount((current) => Math.max(current, visibleDiaryLimit) + DIARY_PAGE_SIZE);
   }, [visibleDiaryLimit]);
 
-  return (
-    <div className="relative isolate min-h-screen overflow-hidden bg-[#070b17] text-white">
-      <CosmicBackground variant="hero" animated />
+  useEffect(() => {
+    if (!embedded) return;
 
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_20%,rgba(196,136,255,0.16),transparent_26%),radial-gradient(circle_at_82%_16%,rgba(126,214,255,0.14),transparent_24%),radial-gradient(circle_at_50%_80%,rgba(117,138,255,0.12),transparent_28%),linear-gradient(180deg,rgba(7,11,23,0.1),rgba(7,11,23,0.88))]" />
+    onPageStateChange?.({
+      pageIndex,
+      canGoBack: pageIndex > 0,
+      canGoForward: pageIndex < 1,
+      goBack: pageIndex === 0 ? goToBookIntro : pageIndex === 1 ? handleBackToCalendar : handleBackToList,
+      goForward: pageIndex === 0 ? goToNextPage : null,
+    });
+  }, [embedded, goToBookIntro, handleBackToCalendar, handleBackToList, goToNextPage, onPageStateChange, pageIndex]);
 
-      <div className="star-layer" aria-hidden="true">
-        {starStyles.map((style, i) => (
-          <span key={i} className="star" style={style} />
-        ))}
+  const content = (
+    <>
+      {!embedded ? <CosmicBackground variant="hero" animated /> : null}
 
-        {Array.from({ length: 4 }).map((_, i) => (
-          <span
-            key={`shooting-${i}`}
-            className="shooting-star"
-            style={{
-              top: `${12 + i * 18}%`,
-              left: `${-20 + i * 4}%`,
-              animationDelay: `${i * 3.5}s`,
-              animationDuration: `${10 + i * 1.2}s`,
-            }}
-          />
-        ))}
-      </div>
+      {!embedded ? (
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_20%,rgba(196,136,255,0.16),transparent_26%),radial-gradient(circle_at_82%_16%,rgba(126,214,255,0.14),transparent_24%),radial-gradient(circle_at_50%_80%,rgba(117,138,255,0.12),transparent_28%),linear-gradient(180deg,rgba(7,11,23,0.1),rgba(7,11,23,0.88))]" />
+      ) : null}
 
-      <div className="relative z-10 flex min-h-screen items-center justify-center px-4 py-6 md:px-6">
-        <div className="diary-book-shell">
+      {!embedded ? <StarrySky /> : null}
+
+      <div className={embedded ? "diary-embedded-stage" : "relative z-10 flex min-h-screen items-center justify-center px-4 py-6 md:px-6"}>
+        <div className={`diary-book-shell ${embedded ? "diary-book-shell-embedded" : ""}`}>
           <div className="diary-book-spine" />
           <div className="diary-book-page-stack">
             <AnimatePresence mode="wait" initial={false}>
               {pageIndex === 0 ? (
                 <Motion.section
                   key="calendar"
-                  initial={{ opacity: 0, x: -40, rotateY: 8 }}
-                  animate={{ opacity: 1, x: 0, rotateY: 0 }}
-                  exit={{ opacity: 0, x: 36, rotateY: -8 }}
-                  transition={{ duration: 0.45, ease: "easeOut" }}
+                  {...diaryPageBlurMotion}
                   className="diary-page diary-page-calendar"
                 >
                   <div className="diary-page-inner">
@@ -328,8 +439,9 @@ export default function DiaryBookPage({
                     </div>
 
                     <div className="diary-sheet diary-sheet-calendar">
-                      <CalendarCard
-                        diaryDates={diaryDates}
+                        <CalendarCard
+                        diaryDates={calendarMarkedDates}
+                        markerTypes={calendarMarkerTypes}
                         selectedDate={selectedDate}
                         displayDate={calendarDate}
                         onChangeMonth={handleChangeMonth}
@@ -353,10 +465,7 @@ export default function DiaryBookPage({
               {pageIndex === 1 ? (
                 <Motion.section
                   key="list"
-                  initial={{ opacity: 0, x: 40, rotateY: -8 }}
-                  animate={{ opacity: 1, x: 0, rotateY: 0 }}
-                  exit={{ opacity: 0, x: -36, rotateY: 8 }}
-                  transition={{ duration: 0.45, ease: "easeOut" }}
+                  {...diaryPageBlurMotion}
                   className="diary-page diary-page-list"
                 >
                   <div className="diary-page-inner">
@@ -387,7 +496,6 @@ export default function DiaryBookPage({
                               <DiaryCard
                                 key={diary.id}
                                 diary={diary}
-                                isActive={selectedDate === diary.date}
                                 cardRef={
                                   diary.id === sortedDiaries[scrollTargetDiaryIndex]?.id
                                     ? selectedDiaryRef
@@ -429,10 +537,7 @@ export default function DiaryBookPage({
               {pageIndex === 2 ? (
                 <Motion.section
                   key="editor"
-                  initial={{ opacity: 0, x: 44, rotateY: -12 }}
-                  animate={{ opacity: 1, x: 0, rotateY: 0 }}
-                  exit={{ opacity: 0, x: -30, rotateY: 10 }}
-                  transition={{ duration: 0.45, ease: "easeOut" }}
+                  {...diaryPageBlurMotion}
                   className="diary-page diary-page-editor"
                 >
                   <div className="diary-page-inner">
@@ -476,11 +581,32 @@ export default function DiaryBookPage({
       </div>
 
       <style>{`
+        .diary-embedded-stage {
+          position: relative;
+          z-index: 2;
+          height: 100%;
+          min-height: 0;
+          display: flex;
+          align-items: stretch;
+          justify-content: center;
+        }
+
         .diary-book-shell {
           position: relative;
           width: min(760px, calc(100vw - 28px));
           min-height: min(90vh, 900px);
           perspective: 1600px;
+        }
+
+        .diary-book-shell-embedded {
+          width: 100%;
+          min-height: 100%;
+          perspective: none;
+        }
+
+        .diary-book-shell-embedded .diary-book-spine,
+        .diary-book-shell-embedded .diary-book-glow {
+          display: none;
         }
 
         .diary-book-spine {
@@ -525,94 +651,9 @@ export default function DiaryBookPage({
           padding-left: 34px;
         }
 
-        .star-layer {
-          position: absolute;
-          inset: 0;
-          pointer-events: none;
-          overflow: hidden;
-        }
-
-        .star {
-          position: absolute;
-          border-radius: 999px;
-          background: white;
-          animation: twinkle ease-in-out infinite;
-          will-change: opacity, transform;
-        }
-
-        .shooting-star {
-          position: absolute;
-          width: 128px;
-          height: 2px;
-          border-radius: 999px;
-          background: linear-gradient(
-            90deg,
-            rgba(255,255,255,0),
-            rgba(255,255,255,0.95),
-            rgba(255,255,255,0)
-          );
-          opacity: 0;
-          transform: rotate(-26deg);
-          box-shadow:
-            0 0 8px rgba(255,255,255,0.72),
-            0 0 18px rgba(197, 225, 255, 0.34);
-          animation: shooting ease-in-out infinite;
-          will-change: opacity, transform;
-        }
-
-        .shooting-star::after {
-          content: "";
-          position: absolute;
-          right: -2px;
-          top: 50%;
-          width: 10px;
-          height: 10px;
-          border-radius: 999px;
-          background: white;
-          transform: translateY(-50%);
-          box-shadow:
-            0 0 10px rgba(255,255,255,0.92),
-            0 0 20px rgba(115, 206, 255, 0.36);
-        }
-
-        @keyframes twinkle {
-          0%, 100% {
-            opacity: 0.25;
-            transform: scale(0.85);
-          }
-          50% {
-            opacity: 1;
-            transform: scale(1.55);
-          }
-        }
-
-        @keyframes shooting {
-          0% {
-            opacity: 0;
-            transform: rotate(-26deg) translate3d(0, 0, 0);
-          }
-          10% {
-            opacity: 1;
-          }
-          35% {
-            opacity: 1;
-            transform: rotate(-26deg) translate3d(420px, 180px, 0);
-          }
-          100% {
-            opacity: 0;
-            transform: rotate(-26deg) translate3d(720px, 310px, 0);
-          }
-        }
-
-        @media (prefers-reduced-motion: reduce) {
-          .star,
-          .shooting-star {
-            animation: none;
-          }
-
-          .shooting-star {
-            display: none;
-          }
+        .diary-book-shell-embedded .diary-book-page-stack {
+          min-height: 100%;
+          padding-left: 0;
         }
 
         .diary-page {
@@ -629,6 +670,52 @@ export default function DiaryBookPage({
           overflow: hidden;
           transform-origin: left center;
           backface-visibility: hidden;
+        }
+
+        .diary-book-shell-embedded .diary-page {
+          border: 0;
+          border-radius: 16px;
+          background: transparent;
+          box-shadow: none;
+        }
+
+        .diary-book-shell-embedded .diary-page-inner {
+          padding: 18px 20px 58px 22px;
+        }
+
+        .diary-book-shell-embedded .diary-page-list .diary-page-inner {
+          padding: 18px 20px 58px 22px;
+        }
+
+        .diary-book-shell-embedded .diary-page-calendar .diary-page-inner {
+          padding: 18px 20px 58px 22px;
+        }
+
+        .diary-book-shell-embedded .diary-page-editor .diary-page-inner {
+          padding: 18px 20px 58px 22px;
+        }
+
+        .diary-book-shell-embedded .diary-page-topbar {
+          margin-bottom: 8px;
+        }
+
+        .diary-book-shell-embedded .diary-page-nav {
+          left: 22px;
+          right: 20px;
+          bottom: 6px;
+        }
+
+        .diary-book-shell-embedded .diary-page-nav .diary-nav-button {
+          display: none;
+        }
+
+        .diary-book-shell-embedded .diary-page-nav {
+          justify-content: flex-end;
+        }
+
+        .diary-book-shell-embedded .diary-sheet-calendar,
+        .diary-book-shell-embedded .diary-sheet-list {
+          margin-bottom: 8px;
         }
 
         .diary-page-inner {
@@ -916,6 +1003,29 @@ export default function DiaryBookPage({
             padding-left: 34px;
           }
 
+          .diary-book-shell-embedded {
+            width: 100%;
+            min-height: 100%;
+          }
+
+          .diary-book-shell-embedded .diary-book-page-stack {
+            min-height: 100%;
+            padding-left: 0;
+          }
+
+          .diary-book-shell-embedded .diary-page-inner,
+          .diary-book-shell-embedded .diary-page-list .diary-page-inner,
+          .diary-book-shell-embedded .diary-page-calendar .diary-page-inner,
+          .diary-book-shell-embedded .diary-page-editor .diary-page-inner {
+            padding: 14px 14px 52px 16px;
+          }
+
+          .diary-book-shell-embedded .diary-page-nav {
+            left: 16px;
+            right: 14px;
+            bottom: -4px;
+          }
+
           .diary-book-spine {
             left: 0;
           }
@@ -966,6 +1076,16 @@ export default function DiaryBookPage({
           }
         }
       `}</style>
+    </>
+  );
+
+  if (embedded) {
+    return content;
+  }
+
+  return (
+    <div className="relative isolate min-h-screen overflow-hidden bg-[#070b17] text-white">
+      {content}
     </div>
   );
 }

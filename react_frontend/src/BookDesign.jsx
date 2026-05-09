@@ -2,17 +2,15 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { LucideHeading3, Sparkles } from "lucide-react";
 import { apiFetch } from "./api";
+import StarrySky from "./components/StarrySky.jsx";
+import { DiaryBookContent } from "./pages/DiaryBookPage.jsx";
+import { TarotReadingCards, TarotReadingContent, TarotReadingMessage } from "./pages/TarotPages.jsx";
 
 const emptyForm = {
   personName: "",
   place: "",
   birthDate: "",
   birthTime: "",
-};
-
-const seededRandom = (seed) => {
-  const x = Math.sin(seed) * 10000;
-  return x - Math.floor(x);
 };
 
 const groupProfiles = (profiles) =>
@@ -45,27 +43,16 @@ export default function BookDesign({ user }) {
   const [currentPage, setCurrentPage] = useState(() => location.state?.page ?? 0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [isOpeningDiary, setIsOpeningDiary] = useState(false);
+  const [isOpeningTarot, setIsOpeningTarot] = useState(false);
+  const [pendingBookSection, setPendingBookSection] = useState(null);
+  const [diaryNavState, setDiaryNavState] = useState(null);
+  const [diaryInitialPageIndex, setDiaryInitialPageIndex] = useState(0);
+  const [diaryInitialSelectedDate, setDiaryInitialSelectedDate] = useState("");
+  const [tarotBookReading, setTarotBookReading] = useState(null);
+  const [tarotReturnToDiaryDate, setTarotReturnToDiaryDate] = useState("");
 
   const isAuthenticated = Boolean(user);
-
-  const starStyles = useMemo(
-    () =>
-      Array.from({ length: 110 }, (_, i) => {
-        const size = seededRandom(i + 1) * 3.5 + 1.2;
-        return {
-          width: `${size}px`,
-          height: `${size}px`,
-          top: `${seededRandom(i + 201) * 100}%`,
-          left: `${seededRandom(i + 401) * 100}%`,
-          opacity: seededRandom(i + 601) * 0.7 + 0.2,
-          boxShadow:
-            "0 0 8px rgba(255,255,255,0.95), 0 0 18px rgba(180,210,255,0.55), 0 0 28px rgba(181,120,255,0.25)",
-          animationDuration: `${seededRandom(i + 801) * 4 + 3}s`,
-          animationDelay: `${seededRandom(i + 1001) * 4}s`,
-        };
-      }),
-    [],
-  );
 
   useEffect(() => {
     apiFetch("/api/chart/profiles/")
@@ -91,10 +78,29 @@ export default function BookDesign({ user }) {
   }, [isAuthenticated]);
 
   useEffect(() => {
+    if (location.state?.bookSection === "tarot") {
+      setIsOpeningDiary(false);
+      setIsOpeningTarot(true);
+      setPendingBookSection(null);
+      setTarotReturnToDiaryDate("");
+      setCurrentPage(location.state?.tarotPage === "draw" ? 3 : 2);
+      return;
+    }
+
+    if (location.state?.bookSection === "diary") {
+      setIsOpeningTarot(false);
+      setIsOpeningDiary(true);
+      setPendingBookSection(null);
+      setDiaryInitialPageIndex(location.state?.diaryPage === "list" ? 1 : 0);
+      setDiaryInitialSelectedDate(location.state?.selectedDate ?? "");
+      setCurrentPage(2);
+      return;
+    }
+
     if (typeof location.state?.page === "number") {
       setCurrentPage(location.state.page);
     }
-  }, [location.state?.page]);
+  }, [location.state?.bookSection, location.state?.diaryPage, location.state?.page, location.state?.selectedDate, location.state?.tarotPage]);
 
   const publicGroupedEntries = useMemo(
     () => sortGroupedEntries(groupProfiles(profilesData.publicProfiles)),
@@ -223,6 +229,75 @@ export default function BookDesign({ user }) {
     navigate("/diary/warp", { state: { target: "/" } });
   }, [isAuthenticated, navigate]);
 
+  const openDiaryBook = useCallback(() => {
+    setIsOpeningDiary(true);
+    setIsOpeningTarot(false);
+    setTarotReturnToDiaryDate("");
+    setDiaryInitialPageIndex(0);
+    setDiaryInitialSelectedDate("");
+    setCurrentPage(1);
+    setPendingBookSection("diary");
+  }, []);
+
+  const openTarotIndex = useCallback(() => {
+    setIsOpeningTarot(true);
+    setIsOpeningDiary(false);
+    setTarotBookReading(null);
+    setTarotReturnToDiaryDate("");
+    setCurrentPage(1);
+    setPendingBookSection("tarot");
+  }, []);
+
+  const openAkashicIndex = useCallback(() => {
+    setIsOpeningDiary(false);
+    setIsOpeningTarot(false);
+    setPendingBookSection(null);
+    setTarotReturnToDiaryDate("");
+    setCurrentPage(2);
+  }, []);
+
+  const closeDiaryBook = useCallback(() => {
+    setIsOpeningDiary(false);
+    setDiaryNavState(null);
+    setCurrentPage(1);
+  }, []);
+
+  const closeTarotIndex = useCallback(() => {
+    setIsOpeningTarot(false);
+    setTarotBookReading(null);
+    setTarotReturnToDiaryDate("");
+    setCurrentPage(1);
+  }, []);
+
+  const returnToDiaryListFromTarot = useCallback(() => {
+    setIsOpeningTarot(false);
+    setTarotBookReading(null);
+    setTarotReturnToDiaryDate("");
+    setIsOpeningDiary(true);
+    setDiaryInitialPageIndex(1);
+    setDiaryInitialSelectedDate(tarotReturnToDiaryDate);
+    setCurrentPage(2);
+  }, [tarotReturnToDiaryDate]);
+
+  const openTarotReadingFromDiary = useCallback(async (entry) => {
+    const readingId = entry?.tarotReadingId;
+    if (!readingId) return;
+
+    setError("");
+    try {
+      const reading = await apiFetch(`/api/tarot/readings/${readingId}/`);
+      setTarotBookReading(reading);
+      setTarotReturnToDiaryDate(entry.date ?? "");
+      setIsOpeningDiary(false);
+      setDiaryNavState(null);
+      setIsOpeningTarot(true);
+      setPendingBookSection(null);
+      setCurrentPage(4);
+    } catch (err) {
+      setError(err.message || "Failed to load tarot reading.");
+    }
+  }, []);
+
   const pages = useMemo(() => {
     const items = [
       {
@@ -277,7 +352,7 @@ export default function BookDesign({ user }) {
               <button
                 type="button"
                 className="chooser-card"
-                onClick={() => setCurrentPage(2)}
+                onClick={openAkashicIndex}
               >
                 <div className="chooser-media" aria-hidden="true">
                   <div className="chooser-media-frame chooser-media-chart">
@@ -303,7 +378,7 @@ export default function BookDesign({ user }) {
               <button
                 type="button"
                 className="chooser-card"
-                onClick={() => navigate("/diary/warp", { state: { target: "/diary" } })}
+                onClick={openDiaryBook}
               >
                 <div className="chooser-media" aria-hidden="true">
                   <div className="chooser-media-frame chooser-media-diary">
@@ -329,7 +404,7 @@ export default function BookDesign({ user }) {
               <button
                 type="button"
                 className="chooser-card"
-                onClick={() => navigate("/tarot")}
+                onClick={openTarotIndex}
               >
                 <div className="chooser-media" aria-hidden="true">
                   <div className="chooser-media-frame chooser-media-tarot">
@@ -504,23 +579,149 @@ export default function BookDesign({ user }) {
       });
     }
 
+    if (isOpeningDiary) {
+      items.splice(2, 0, {
+        key: "diary-book",
+        title: "DIARY CALENDAR",
+        subtitle: "Diary / Calendar",
+        content: (
+          <div className="book-diary-content">
+            <DiaryBookContent
+              authReady
+              embedded
+              initialPageIndex={diaryInitialPageIndex}
+              initialSelectedDate={diaryInitialSelectedDate}
+              onExitToBook={closeDiaryBook}
+              onOpenTarotReading={openTarotReadingFromDiary}
+              onPageStateChange={setDiaryNavState}
+            />
+          </div>
+        ),
+      });
+    }
+
+    if (isOpeningTarot) {
+      items.splice(2, 0, {
+        key: "tarot-index",
+        title: "TAROT INDEX",
+        subtitle: "select tarot page",
+        content: (
+          <div className="tarot-index-page">
+            <button type="button" className="tarot-index-card" onClick={() => {
+              setTarotBookReading(null);
+              setTarotReturnToDiaryDate("");
+              setCurrentPage(3);
+            }}>
+              <span className="tarot-index-art tarot-index-art-reading" aria-hidden="true">
+                <span className="tarot-art-card tarot-art-card-one" />
+                <span className="tarot-art-card tarot-art-card-two" />
+                <span className="tarot-art-moon" />
+                <span className="tarot-art-face" />
+                <span className="tarot-art-bow tarot-art-bow-reading" />
+                <span className="tarot-art-spark tarot-art-spark-one" />
+                <span className="tarot-art-spark tarot-art-spark-two" />
+              </span>
+              <span className="tarot-index-kicker">Reading</span>
+              <strong>Draw Cards</strong>
+              <span>Open a tarot reading and save the result.</span>
+            </button>
+            <button type="button" className="tarot-index-card" onClick={() => navigate("/tarot/decks")}>
+              <span className="tarot-index-art tarot-index-art-decks" aria-hidden="true">
+                <span className="tarot-art-stack tarot-art-stack-one" />
+                <span className="tarot-art-stack tarot-art-stack-two" />
+                <span className="tarot-art-stack tarot-art-stack-three" />
+                <span className="tarot-art-gem" />
+                <span className="tarot-art-bow tarot-art-bow-decks" />
+                <span className="tarot-art-spark tarot-art-spark-three" />
+              </span>
+              <span className="tarot-index-kicker">Decks</span>
+              <strong>Card Library</strong>
+              <span>Browse and edit tarot decks and cards.</span>
+            </button>
+          </div>
+        ),
+      });
+      items.splice(3, 0, {
+        key: "tarot-read",
+        title: "TAROT DRAW",
+        subtitle: "draw cards",
+        content: (
+          <div className="book-tarot-reading-content">
+            <TarotReadingContent
+              embedded
+              showResultPanel={false}
+              onReadingComplete={(reading) => {
+                setTarotBookReading(reading);
+                setCurrentPage(4);
+              }}
+            />
+          </div>
+        ),
+      });
+      items.splice(4, 0, {
+        key: "tarot-cards",
+        title: "TAROT CARDS",
+        subtitle: "drawn cards",
+        content: (
+          <div className="book-tarot-result-content">
+            {tarotBookReading ? (
+              <>
+                <TarotReadingCards result={tarotBookReading} />
+                <p className="mt-5 text-sm text-slate-400">
+                  Remaining saved readings: {tarotBookReading.remaining}/{tarotBookReading.limit}
+                </p>
+              </>
+            ) : (
+              <p className="rounded-xl border border-white/10 bg-white/8 px-4 py-3 text-sm text-slate-200">Your reading will appear here.</p>
+            )}
+          </div>
+        ),
+      });
+      items.splice(5, 0, {
+        key: "tarot-message",
+        title: "TAROT MESSAGE",
+        subtitle: "witch's reading",
+        content: (
+          <div className="book-tarot-result-content">
+            {tarotBookReading ? (
+              <div className="book-tarot-message-scroll">
+                <TarotReadingMessage result={tarotBookReading} />
+              </div>
+            ) : (
+              <p className="rounded-xl border border-white/10 bg-white/8 px-4 py-3 text-sm text-slate-200">Your reading will appear here.</p>
+            )}
+          </div>
+        ),
+      });
+    }
+
     return items;
   }, [
     calculate,
     closeAndLogout,
+    closeDiaryBook,
     form.birthDate,
     form.birthTime,
     form.personName,
     form.place,
     isAuthenticated,
+    isOpeningDiary,
+    isOpeningTarot,
+    diaryInitialPageIndex,
+    diaryInitialSelectedDate,
     loading,
+    navigate,
+    openAkashicIndex,
+    openDiaryBook,
+    openTarotReadingFromDiary,
+    openTarotIndex,
     privateGroupedEntries,
     publicGroupedEntries,
     openProfileForEdit,
-    navigate,
     result,
     saveProfile,
     selectedProfile,
+    tarotBookReading,
   ]);
 
   const pageCount = pages.length;
@@ -529,31 +730,27 @@ export default function BookDesign({ user }) {
     setCurrentPage((current) => Math.min(current, pageCount - 1));
   }, [pageCount]);
 
+  useEffect(() => {
+    if (!pendingBookSection) return undefined;
+
+    const frameId = window.requestAnimationFrame(() => {
+      setCurrentPage(2);
+      setPendingBookSection(null);
+    });
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+    };
+  }, [pendingBookSection]);
+
   return (
     <>
       <style>{sharedStyles}</style>
 
-      <div className="app-shell">
+      <div className={`app-shell ${isOpeningDiary ? "app-shell-diary-opening" : ""}`}>
         {error ? <div className="chart-error">{error}</div> : null}
 
-        <div className="star-layer">
-          {starStyles.map((style, i) => (
-            <span key={i} className="star" style={style} />
-          ))}
-
-          {Array.from({ length: 4 }).map((_, i) => (
-            <span
-              key={`shooting-${i}`}
-              className="shooting-star"
-              style={{
-                top: `${12 + i * 18}%`,
-                left: `${12 + i * 22}%`,
-                animationDelay: `${i * 3.5}s`,
-                animationDuration: `${10 + i * 1.2}s`,
-              }}
-            />
-          ))}
-        </div>
+        <StarrySky className="book-starry-sky" tone="warm" shootingAngle={-18} />
 
         <div className="page-wrap">
           <div className="book-shell">
@@ -569,24 +766,77 @@ export default function BookDesign({ user }) {
                 </section>
               ))}
 
-              <div className="book-nav">
-                <button
-                  onClick={() => setCurrentPage((page) => Math.max(0, page - 1))}
-                  disabled={currentPage === 0}
-                  type="button"
-                >
-                  {"<"}
-                </button>
-                <button
-                  onClick={() =>
-                    setCurrentPage((page) => Math.min(pageCount - 1, page + 1))
-                  }
-                  disabled={currentPage === pageCount - 1}
-                  type="button"
-                >
-                  {">"}
-                </button>
-              </div>
+              {isOpeningDiary ? (
+                <div className="book-nav">
+                  <button
+                    onClick={diaryNavState?.goBack ?? closeDiaryBook}
+                    disabled={!diaryNavState?.goBack}
+                    type="button"
+                  >
+                    {"<"}
+                  </button>
+                  {diaryNavState?.goForward ? (
+                    <button
+                      onClick={diaryNavState.goForward}
+                      type="button"
+                    >
+                      {">"}
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
+
+              {isOpeningTarot ? (
+                <div className="book-nav">
+                  <button
+                    onClick={() => {
+                      if (currentPage === 4 && tarotReturnToDiaryDate) {
+                        returnToDiaryListFromTarot();
+                        return;
+                      }
+                      if (currentPage > 2) {
+                        setCurrentPage((page) => page - 1);
+                        return;
+                      }
+                      closeTarotIndex();
+                    }}
+                    type="button"
+                  >
+                    {"<"}
+                  </button>
+                  {currentPage === 2 ? (
+                    <button onClick={() => setCurrentPage(3)} type="button">
+                      {">"}
+                    </button>
+                  ) : null}
+                  {(currentPage === 3 || currentPage === 4) && tarotBookReading ? (
+                    <button onClick={() => setCurrentPage((page) => page + 1)} type="button">
+                      {">"}
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
+
+              {!isOpeningDiary && !isOpeningTarot ? (
+                <div className="book-nav">
+                  <button
+                    onClick={() => setCurrentPage((page) => Math.max(0, page - 1))}
+                    disabled={currentPage === 0}
+                    type="button"
+                  >
+                    {"<"}
+                  </button>
+                  <button
+                    onClick={() =>
+                      setCurrentPage((page) => Math.min(pageCount - 1, page + 1))
+                    }
+                    disabled={currentPage === pageCount - 1}
+                    type="button"
+                  >
+                    {">"}
+                  </button>
+                </div>
+              ) : null}
             </div>
           </div>
 
@@ -701,100 +951,36 @@ const sharedStyles = `
     position: relative;
     min-height: calc(100vh - 81px);
     overflow: hidden;
+    background:
+      radial-gradient(circle at 15% 20%, rgba(196, 136, 255, 0.18), transparent 26%),
+      radial-gradient(circle at 82% 16%, rgba(126, 214, 255, 0.16), transparent 24%),
+      radial-gradient(circle at 50% 80%, rgba(117, 138, 255, 0.14), transparent 28%),
+      linear-gradient(180deg, #161b2d 0%, #252b46 45%, #32385a 100%);
+    transition: background 720ms ease, filter 720ms ease;
   }
 
-  .star-layer {
+  .app-shell::before {
+    content: "";
     position: absolute;
     inset: 0;
     pointer-events: none;
-    overflow: hidden;
-  }
-
-  .star {
-    position: absolute;
-    border-radius: 999px;
-    background: white;
-    animation: twinkle ease-in-out infinite;
-    will-change: opacity, transform;
-  }
-
-  .shooting-star {
-    position: absolute;
-    width: 128px;
-    height: 2px;
-    border-radius: 999px;
-    background: linear-gradient(
-      90deg,
-      rgba(255,255,255,0),
-      rgba(255,255,255,0.95),
-      rgba(255,255,255,0)
-    );
+    background:
+      radial-gradient(circle at 17% 18%, rgba(151, 91, 218, 0.16), transparent 24%),
+      radial-gradient(circle at 78% 18%, rgba(255, 147, 97, 0.13), transparent 22%),
+      radial-gradient(circle at 42% 78%, rgba(190, 73, 104, 0.12), transparent 26%),
+      linear-gradient(180deg, rgba(5, 7, 18, 0.34), rgba(5, 7, 18, 0.94));
     opacity: 0;
-    transform: rotate(-26deg);
-    box-shadow:
-      0 0 8px rgba(255,255,255,0.72),
-      0 0 18px rgba(197, 225, 255, 0.34);
-    animation: shooting ease-in-out infinite;
-    will-change: opacity, transform;
+    transition: opacity 720ms ease;
+    z-index: 0;
   }
 
-  .shooting-star::after {
-    content: "";
-    position: absolute;
-    right: -2px;
-    top: 50%;
-    width: 10px;
-    height: 10px;
-    border-radius: 999px;
-    background: white;
-    transform: translateY(-50%);
-    box-shadow:
-      0 0 10px rgba(255,255,255,0.92),
-      0 0 20px rgba(115, 206, 255, 0.36);
+  .app-shell-diary-opening::before {
+    opacity: 1;
   }
 
-  @keyframes twinkle {
-    0%, 100% {
-      opacity: 0.25;
-      transform: scale(0.85);
-    }
-    50% {
-      opacity: 1;
-      transform: scale(1.55);
-    }
-  }
-
-  @keyframes shooting {
-    0% {
-      opacity: 0;
-      transform: rotate(-18deg) translate3d(0, 0, 0);
-    }
-    10% {
-      opacity: 1;
-    }
-    35% {
-      opacity: 1;
-      transform: rotate(-18deg) translate3d(260px, 110px, 0);
-    }
-    70% {
-      opacity: 1;
-      transform: rotate(-18deg) translate3d(560px, 192px, 0);
-    }
-    100% {
-      opacity: 0;
-      transform: rotate(-18deg) translate3d(840px, 168px, 0);
-    }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .star,
-    .shooting-star {
-      animation: none;
-    }
-
-    .shooting-star {
-      display: none;
-    }
+  .app-shell-diary-opening .book-starry-sky {
+    opacity: 0.88;
+    transition: opacity 720ms ease;
   }
 
   .page-wrap {
@@ -846,6 +1032,7 @@ const sharedStyles = `
     width: 34px;
     z-index: 3;
     border-radius: 8px;
+    border: 1.5px solid rgba(255,255,255,0.24);
     background:
       radial-gradient(circle at 10% 10%, #ffffff 1px, transparent 2px),
       radial-gradient(circle at 25% 25%, #aeefff 1.5px, transparent 3px),
@@ -859,8 +1046,9 @@ const sharedStyles = `
       radial-gradient(circle at 90% 50%, #c8b6ff 1px, transparent 2px),
       linear-gradient(to bottom, rgba(120,150,255,0.42), rgba(180,120,255,0.62));
     box-shadow:
-      0 0 12px rgba(140, 160, 255, 0.55),
-      inset 0 0 6px rgba(255,255,255,0.2);
+      0 0 16px rgba(140, 160, 255, 0.68),
+      0 0 28px rgba(216, 196, 255, 0.22),
+      inset 0 0 8px rgba(255,255,255,0.28);
     animation: spineSparkle 3s ease-in-out infinite alternate;
   }
 
@@ -871,7 +1059,8 @@ const sharedStyles = `
     top: 0;
     bottom: 0;
     width: 10px;
-    background: linear-gradient(to right, rgba(0,0,0,0.22), rgba(255,255,255,0.10));
+    background: linear-gradient(to right, rgba(0,0,0,0.3), rgba(255,255,255,0.18), rgba(255,255,255,0.04));
+    box-shadow: 1px 0 0 rgba(255,255,255,0.14), -1px 0 0 rgba(0,0,0,0.22);
     z-index: 3;
   }
 
@@ -893,13 +1082,17 @@ const sharedStyles = `
     margin-left: 0;
     border-radius: 22px;
     background:
-      radial-gradient(circle at top left, rgba(143, 168, 255, 0.10), transparent 26%),
-      linear-gradient(135deg, #1f2238, #2a2f4d);
+      radial-gradient(circle at top left, rgba(143, 168, 255, 0.08), transparent 28%),
+      linear-gradient(135deg, rgba(31, 34, 56, 0.18), rgba(42, 47, 77, 0.12));
     color: #f5f7ff;
     box-shadow:
-      0 14px 34px rgba(0,0,0,0.28),
-      inset 0 1px 0 rgba(255,255,255,0.04);
-    border: 1px solid rgba(255,255,255,0.06);
+      0 14px 34px rgba(0,0,0,0.18),
+      0 0 0 1px rgba(255,255,255,0.08),
+      0 0 24px rgba(216,196,255,0.12),
+      inset 0 1px 0 rgba(255,255,255,0.08),
+      inset 0 0 30px rgba(255,255,255,0.025);
+    border: 2px solid rgba(255,255,255,0.28);
+    backdrop-filter: blur(2px);
     transform-origin: left center;
     backface-visibility: hidden;
     transition: transform 0.8s ease, opacity 0.45s ease;
@@ -918,6 +1111,569 @@ const sharedStyles = `
     opacity: 1;
     transform: rotateY(0deg);
     z-index: 2;
+  }
+
+  .diary-entry-page {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+    border-radius: 18px;
+    background:
+      radial-gradient(circle at 18% 18%, rgba(196, 136, 255, 0.16), transparent 26%),
+      radial-gradient(circle at 82% 18%, rgba(126, 214, 255, 0.12), transparent 24%),
+      linear-gradient(180deg, rgba(7, 11, 23, 0.42), rgba(13, 20, 41, 0.92));
+  }
+
+  .book-diary-content {
+    height: 100%;
+    min-height: 0;
+    margin: -12px -14px -70px -22px;
+    color: #fff;
+  }
+
+  .book-diary-content .reading-title,
+  .book-diary-content .reading-subtitle {
+    display: none;
+  }
+
+  .book-diary-content .diary-page {
+    border-radius: 20px;
+    box-shadow:
+      0 12px 34px rgba(0,0,0,0.26),
+      inset 0 1px 0 rgba(255,255,255,0.06);
+  }
+
+  .tarot-index-page {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-content: center;
+    max-width: 720px;
+    margin: 0 auto;
+    gap: 18px;
+    padding: 34px 8px 12px;
+  }
+
+  .book-tarot-reading-content,
+  .book-tarot-result-content {
+    flex: 1;
+    min-height: 0;
+    margin: -10px -14px -44px -22px;
+    overflow-y: auto;
+    padding: 8px 12px 78px 32px;
+    scrollbar-width: none;
+  }
+
+  .book-tarot-reading-content {
+    padding-top: 0;
+  }
+
+  .book-tarot-reading-content::-webkit-scrollbar,
+  .book-tarot-result-content::-webkit-scrollbar,
+  .book-tarot-message-scroll::-webkit-scrollbar {
+    display: none;
+  }
+
+  .book-tarot-reading-content .tarot-reading-embedded {
+    align-items: start;
+  }
+
+  .book-tarot-message-scroll {
+    max-height: 100%;
+    overflow-y: auto;
+    padding-left: 18px;
+    padding-right: 8px;
+    scrollbar-width: none;
+  }
+
+  .book-tarot-message-scroll > div {
+    border-color: transparent;
+    background: transparent;
+    padding: 0;
+  }
+
+  .book-tarot-message-scroll > div > p:first-child {
+    display: none;
+  }
+
+  .book-tarot-message-scroll > div > div {
+    font-size: 16px;
+    line-height: 1.9;
+    color: rgba(245,247,255,0.93);
+    text-align: justify;
+  }
+
+  .book-tarot-reading-content section,
+  .book-tarot-result-content section {
+    border-radius: 16px;
+    padding: 16px;
+  }
+
+  .book-tarot-reading-content section:first-child {
+    border-color: transparent;
+    background: transparent;
+    box-shadow: none;
+    padding: 0 12px 10px;
+  }
+
+  .book-tarot-reading-content .min-h-\\[420px\\],
+  .book-tarot-result-content .min-h-\\[420px\\] {
+    min-height: 320px;
+  }
+
+  .tarot-index-card {
+    min-height: 260px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    gap: 10px;
+    border: 1px solid rgba(255,255,255,0.16);
+    border-radius: 18px;
+    background:
+      radial-gradient(circle at 50% 24%, rgba(255, 232, 176, 0.18), transparent 28%),
+      linear-gradient(150deg, rgba(46, 38, 76, 0.82), rgba(244, 194, 194, 0.18));
+    color: #fff;
+    text-align: left;
+    padding: 20px;
+    cursor: pointer;
+    box-shadow:
+      0 16px 36px rgba(0,0,0,0.2),
+      inset 0 1px 0 rgba(255,255,255,0.08);
+    transition:
+      transform 0.2s ease,
+      border-color 0.2s ease,
+      background 0.2s ease,
+      box-shadow 0.2s ease;
+  }
+
+  .tarot-index-art {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1.12;
+    margin-bottom: auto;
+    overflow: hidden;
+    border-radius: 14px;
+    border: 1px solid rgba(255,255,255,0.16);
+    background:
+      radial-gradient(circle at 34% 24%, rgba(255, 248, 211, 0.3), transparent 24%),
+      radial-gradient(circle at 72% 76%, rgba(126, 214, 255, 0.18), transparent 28%),
+      linear-gradient(150deg, rgba(255,255,255,0.08), rgba(255,255,255,0.03));
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.1),
+      0 12px 26px rgba(0,0,0,0.16);
+  }
+
+  .tarot-index-art::before {
+    content: "";
+    position: absolute;
+    left: 12%;
+    right: 12%;
+    bottom: 10%;
+    height: 14%;
+    border-radius: 999px;
+    background: radial-gradient(ellipse, rgba(244, 194, 194, 0.22), transparent 72%);
+    filter: blur(2px);
+  }
+
+  .tarot-index-art::after {
+    content: "";
+    position: absolute;
+    inset: 10px;
+    border-radius: 12px;
+    border: 1px dashed rgba(255,255,255,0.16);
+    pointer-events: none;
+  }
+
+  .tarot-index-art span {
+    position: absolute;
+    display: block;
+  }
+
+  .tarot-art-card,
+  .tarot-art-stack {
+    width: 32%;
+    height: 56%;
+    border-radius: 10px;
+    border: 1px solid rgba(255,255,255,0.48);
+    box-shadow:
+      0 12px 18px rgba(0,0,0,0.18),
+      inset 0 0 14px rgba(255,255,255,0.12);
+  }
+
+  .tarot-art-card-one {
+    left: 25%;
+    top: 27%;
+    background: linear-gradient(150deg, rgba(164, 138, 255, 0.68), rgba(255, 218, 180, 0.28));
+    transform: rotate(-13deg);
+  }
+
+  .tarot-art-card-two {
+    right: 25%;
+    top: 19%;
+    background:
+      radial-gradient(circle at 50% 34%, rgba(255, 239, 183, 0.6), transparent 22%),
+      linear-gradient(150deg, rgba(47, 39, 78, 0.94), rgba(244, 194, 194, 0.36));
+    transform: rotate(10deg);
+  }
+
+  .tarot-art-card-one::before,
+  .tarot-art-card-two::before,
+  .tarot-art-stack-one::before,
+  .tarot-art-stack-two::before,
+  .tarot-art-stack-three::before {
+    content: "";
+    position: absolute;
+    inset: 8px;
+    border-radius: 7px;
+    border: 1px solid rgba(255,255,255,0.24);
+  }
+
+  .tarot-art-moon {
+    right: 34%;
+    top: 30%;
+    width: 24px;
+    height: 24px;
+    border-radius: 999px;
+    background: #ffedb5;
+    box-shadow: 0 0 18px rgba(255, 232, 168, 0.58);
+  }
+
+  .tarot-art-moon::after {
+    content: "";
+    position: absolute;
+    left: 8px;
+    top: -2px;
+    width: 24px;
+    height: 24px;
+    border-radius: 999px;
+    background: rgba(52, 42, 80, 0.95);
+  }
+
+  .tarot-art-face {
+    left: 52%;
+    top: 42%;
+    width: 38px;
+    height: 22px;
+    transform: translateX(-50%);
+    z-index: 3;
+  }
+
+  .tarot-art-face::before,
+  .tarot-art-face::after {
+    content: "";
+    position: absolute;
+    top: 2px;
+    width: 5px;
+    height: 5px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.82);
+    box-shadow: 0 0 8px rgba(255,255,255,0.45);
+  }
+
+  .tarot-art-face::before {
+    left: 8px;
+  }
+
+  .tarot-art-face::after {
+    right: 8px;
+  }
+
+  .tarot-art-face {
+    border-bottom: 2px solid rgba(255,255,255,0.66);
+    border-radius: 0 0 999px 999px;
+  }
+
+  .tarot-art-spark {
+    width: 9px;
+    height: 9px;
+    background: #fff;
+    clip-path: polygon(50% 0, 61% 36%, 100% 50%, 61% 64%, 50% 100%, 39% 64%, 0 50%, 39% 36%);
+    box-shadow: 0 0 12px rgba(255,255,255,0.7);
+  }
+
+  .tarot-art-spark-one {
+    left: 22%;
+    top: 19%;
+  }
+
+  .tarot-art-spark-two {
+    right: 20%;
+    bottom: 22%;
+    width: 7px;
+    height: 7px;
+    opacity: 0.78;
+  }
+
+  .tarot-art-spark-three {
+    left: 17%;
+    bottom: 22%;
+    width: 8px;
+    height: 8px;
+  }
+
+  .tarot-art-spark-four {
+    right: 18%;
+    top: 20%;
+    width: 8px;
+    height: 8px;
+  }
+
+  .tarot-art-bow {
+    width: 34px;
+    height: 18px;
+    z-index: 4;
+  }
+
+  .tarot-art-bow::before,
+  .tarot-art-bow::after {
+    content: "";
+    position: absolute;
+    top: 3px;
+    width: 15px;
+    height: 12px;
+    border-radius: 10px 10px 3px 10px;
+    background: linear-gradient(135deg, #ffd6e8, #f4c2c2);
+    box-shadow: 0 0 10px rgba(244, 194, 194, 0.32);
+  }
+
+  .tarot-art-bow::before {
+    left: 1px;
+    transform: rotate(-28deg);
+  }
+
+  .tarot-art-bow::after {
+    right: 1px;
+    transform: rotate(28deg) scaleX(-1);
+  }
+
+  .tarot-art-bow-reading {
+    left: 50%;
+    top: 14%;
+    transform: translateX(-50%);
+  }
+
+  .tarot-art-bow-decks {
+    left: 50%;
+    bottom: 17%;
+    transform: translateX(-50%);
+  }
+
+  .tarot-art-stack-one {
+    left: 24%;
+    top: 28%;
+    background: linear-gradient(150deg, rgba(255, 210, 230, 0.46), rgba(117, 138, 255, 0.28));
+    transform: rotate(-14deg);
+  }
+
+  .tarot-art-stack-two {
+    left: 34%;
+    top: 22%;
+    background: linear-gradient(150deg, rgba(255, 239, 183, 0.42), rgba(216, 196, 255, 0.34));
+    transform: rotate(-2deg);
+  }
+
+  .tarot-art-stack-three {
+    right: 25%;
+    top: 28%;
+    background: linear-gradient(150deg, rgba(126, 214, 255, 0.36), rgba(244, 194, 194, 0.34));
+    transform: rotate(12deg);
+  }
+
+  .tarot-art-gem {
+    left: 50%;
+    top: 45%;
+    width: 24px;
+    height: 24px;
+    background: linear-gradient(135deg, #fff3b8, #f4c2c2);
+    transform: translate(-50%, -50%) rotate(45deg);
+    border-radius: 6px 2px 6px 2px;
+    box-shadow: 0 0 18px rgba(255, 231, 166, 0.5);
+  }
+
+  .tarot-art-gem::before {
+    content: "";
+    position: absolute;
+    inset: 6px;
+    border-radius: 3px 1px 3px 1px;
+    background: rgba(255,255,255,0.34);
+  }
+
+  .tarot-art-scroll {
+    left: 22%;
+    top: 20%;
+    width: 56%;
+    height: 62%;
+    border-radius: 16px;
+    border: 1px solid rgba(255,255,255,0.38);
+    background:
+      linear-gradient(90deg, rgba(255,255,255,0.2) 0 14%, transparent 14%),
+      linear-gradient(150deg, rgba(255, 248, 211, 0.34), rgba(244, 194, 194, 0.16));
+    box-shadow:
+      0 14px 24px rgba(0,0,0,0.18),
+      inset 0 1px 0 rgba(255,255,255,0.14);
+  }
+
+  .tarot-art-seal {
+    right: 25%;
+    bottom: 22%;
+    width: 26px;
+    height: 26px;
+    border-radius: 999px;
+    background: radial-gradient(circle, #fff3b8 0 34%, #f4c2c2 36% 64%, rgba(244,194,194,0.2) 66%);
+    box-shadow: 0 0 16px rgba(244, 194, 194, 0.42);
+  }
+
+  .tarot-art-heart {
+    left: 27%;
+    bottom: 24%;
+    width: 17px;
+    height: 17px;
+    border-radius: 9px 9px 2px 9px;
+    background: #ffd1df;
+    transform: rotate(45deg);
+    box-shadow: 0 0 14px rgba(255, 193, 214, 0.48);
+  }
+
+  .tarot-art-heart::before,
+  .tarot-art-heart::after {
+    content: "";
+    position: absolute;
+    width: 17px;
+    height: 17px;
+    border-radius: 999px;
+    background: inherit;
+  }
+
+  .tarot-art-heart::before {
+    left: -8px;
+    top: 0;
+  }
+
+  .tarot-art-heart::after {
+    left: 0;
+    top: -8px;
+  }
+
+  .tarot-art-line {
+    left: 38%;
+    height: 2px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.46);
+  }
+
+  .tarot-art-line-one {
+    top: 43%;
+    width: 28%;
+  }
+
+  .tarot-art-line-two {
+    top: 54%;
+    width: 20%;
+  }
+
+  .tarot-index-card:hover {
+    transform: translateY(-1px);
+    border-color: rgba(255,255,255,0.3);
+    background-color: rgba(255,255,255,0.12);
+    box-shadow:
+      0 18px 42px rgba(0,0,0,0.24),
+      0 0 0 1px rgba(255,255,255,0.1) inset;
+  }
+
+  .tarot-index-card-subtle {
+    opacity: 0.82;
+  }
+
+  .tarot-index-kicker {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: rgba(244, 194, 194, 0.92);
+  }
+
+  .tarot-index-card strong {
+    font-size: 24px;
+    line-height: 1.2;
+  }
+
+  .tarot-index-card span:last-child {
+    font-size: 14px;
+    line-height: 1.7;
+    color: rgba(226, 231, 255, 0.78);
+  }
+
+  .diary-entry-page::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(90deg, transparent, rgba(255,255,255,0.06), transparent),
+      radial-gradient(circle at 50% 72%, rgba(255,255,255,0.12), transparent 34%);
+    opacity: 0.58;
+  }
+
+  .diary-entry-cover {
+    position: relative;
+    width: min(260px, 64vw);
+    aspect-ratio: 3 / 4;
+    border-radius: 18px 12px 12px 18px;
+    border: 1px solid rgba(255,255,255,0.14);
+    background:
+      linear-gradient(90deg, rgba(255,255,255,0.18) 0 12px, transparent 12px),
+      radial-gradient(circle at 32% 24%, rgba(244, 194, 194, 0.2), transparent 22%),
+      linear-gradient(135deg, #171d34, #252b4a 56%, #121827);
+    box-shadow:
+      0 26px 46px rgba(0,0,0,0.32),
+      0 0 40px rgba(126, 214, 255, 0.1),
+      inset 0 1px 0 rgba(255,255,255,0.08);
+    transform: translateY(4px);
+  }
+
+  .diary-entry-moon {
+    position: absolute;
+    left: 50%;
+    top: 22%;
+    width: 58px;
+    height: 58px;
+    border-radius: 999px;
+    transform: translateX(-50%);
+    background: radial-gradient(circle, #fff8d9 0 32%, #f4c2c2 34% 48%, transparent 50%);
+    box-shadow: 0 0 24px rgba(244, 194, 194, 0.26);
+  }
+
+  .diary-entry-line {
+    position: absolute;
+    left: 24%;
+    right: 18%;
+    height: 2px;
+    border-radius: 999px;
+    background: rgba(220, 228, 255, 0.42);
+  }
+
+  .diary-entry-line-one {
+    top: 54%;
+  }
+
+  .diary-entry-line-two {
+    top: 62%;
+    right: 30%;
+  }
+
+  .diary-entry-ribbon {
+    position: absolute;
+    right: 24px;
+    top: 0;
+    width: 24px;
+    height: 42%;
+    background: linear-gradient(180deg, #f4c2c2, #d8c4ff);
+    clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 82%, 0 100%);
+    box-shadow: 0 0 16px rgba(244, 194, 194, 0.22);
   }
 
   .page::after {
@@ -1189,6 +1945,7 @@ const sharedStyles = `
     display: grid;
     gap: 18px;
     grid-template-columns: minmax(0, 1fr);
+    padding-left: 22px;
   }
 
   .chooser-card {
@@ -1544,6 +2301,7 @@ const sharedStyles = `
   @media (max-width: 840px) {
     .chooser-grid {
       grid-template-columns: 1fr;
+      padding-left: 0;
     }
 
     .chooser-card {
@@ -1551,6 +2309,18 @@ const sharedStyles = `
       gap: 16px;
       padding: 18px;
     }
+
+    .tarot-index-page {
+      grid-template-columns: 1fr;
+      align-content: start;
+      overflow-y: auto;
+      padding: 42px 8px 12px;
+    }
+
+    .tarot-index-card {
+      min-height: 150px;
+    }
+
   }
 
   .form-card {
@@ -1740,6 +2510,16 @@ const sharedStyles = `
     transform: none;
   }
 
+  .book-nav-hidden {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 180ms ease;
+  }
+
+  .book-nav-hidden button {
+    pointer-events: none;
+  }
+
   .footer {
     text-align: center;
     padding: 0 16px 18px;
@@ -1757,6 +2537,10 @@ const sharedStyles = `
     .page {
       padding: 26px 20px 88px 28px;
       margin-left: 0;
+    }
+
+    .diary-entry-cover {
+      width: min(220px, 62vw);
     }
 
     .form-row {

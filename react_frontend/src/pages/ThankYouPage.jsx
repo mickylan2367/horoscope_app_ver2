@@ -13,14 +13,6 @@ export default function ThankYouPage() {
             <p className="mx-auto mt-5 max-w-xl text-sm leading-8 text-slate-200">
               Your session has been gently sealed. When you return, the door will open again from a fresh login.
             </p>
-            <div className="mt-8 flex flex-wrap justify-center gap-3">
-              <Link className="inline-flex cursor-pointer rounded-full bg-[#f4c2c2] px-6 py-3 font-semibold text-[#2a2036] transition hover:bg-[#ffd6df]" to="/login">
-                LOGIN
-              </Link>
-              <Link className="inline-flex cursor-pointer rounded-full border border-white/14 bg-white/8 px-6 py-3 font-semibold text-white transition hover:bg-white/14" to="/">
-                HOME
-              </Link>
-            </div>
           </div>
         </div>
       </section>

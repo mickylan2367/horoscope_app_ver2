@@ -1,5 +1,5 @@
 import { memo, useMemo } from "react";
-import { ChevronLeft, ChevronRight, Star } from "lucide-react";
+import { ChevronLeft, ChevronRight, Heart, Star } from "lucide-react";
 
 function formatDate(year, month, day) {
   return `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
@@ -7,6 +7,7 @@ function formatDate(year, month, day) {
 
 function CalendarCard({
   diaryDates = [],
+  markerTypes = {},
   selectedDate = "",
   displayDate = new Date(),
   onChangeMonth,
@@ -17,6 +18,8 @@ function CalendarCard({
   const month = displayDate.getMonth();
   const monthLabel = `${year} / ${String(month + 1).padStart(2, "0")}`;
   const diaryDateSet = useMemo(() => new Set(diaryDates), [diaryDates]);
+  const heartDateSet = useMemo(() => new Set(markerTypes.diaryDates ?? []), [markerTypes.diaryDates]);
+  const starDateSet = useMemo(() => new Set(markerTypes.tarotOnlyDates ?? []), [markerTypes.tarotOnlyDates]);
   const cells = useMemo(() => {
     const firstDay = new Date(year, month, 1).getDay();
     const lastDate = new Date(year, month + 1, 0).getDate();
@@ -52,6 +55,8 @@ function CalendarCard({
               year === today.getFullYear();
             const dateKey = day === "" ? "" : formatDate(year, month, day);
             const hasDiary = diaryDateSet.has(dateKey);
+            const hasHeartMarker = heartDateSet.has(dateKey);
+            const hasStarMarker = starDateSet.has(dateKey);
             const isSelected = selectedDate === dateKey;
             return (
               <button
@@ -72,11 +77,19 @@ function CalendarCard({
                 }`}
               >
                 {hasDiary && !isSelected ? (
-                  <Star
-                    className="absolute inset-1/2 -z-10 h-[82%] w-[82%] -translate-x-1/2 -translate-y-1/2 fill-white/10 text-white/24"
-                    strokeWidth={1.2}
-                    aria-hidden="true"
-                  />
+                  hasHeartMarker ? (
+                    <Heart
+                      className="absolute inset-1/2 -z-10 h-[108%] w-[108%] -translate-x-1/2 -translate-y-1/2 fill-[#f4c2c2]/22 text-[#ffdbe6]/55"
+                      strokeWidth={1.25}
+                      aria-hidden="true"
+                    />
+                  ) : hasStarMarker ? (
+                    <Star
+                      className="absolute inset-1/2 -z-10 h-[94%] w-[94%] -translate-x-1/2 -translate-y-1/2 fill-white/12 text-white/30"
+                      strokeWidth={1.2}
+                      aria-hidden="true"
+                    />
+                  ) : null
                 ) : null}
                 <span className="relative z-10">{day}</span>
               </button>
