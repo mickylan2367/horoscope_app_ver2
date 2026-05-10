@@ -3,18 +3,21 @@
   "installCommand": "cd react_frontend && npm ci",
   "buildCommand": "cd react_frontend && npm run build",
   "outputDirectory": "react_frontend/dist",
-  "rewrites": [
+  "routes": [
     {
-      "source": "/api/:path*",
-      "destination": "https://horoscope-app-ver2.onrender.com/api/:path*"
+      "src": "/api/(.*)",
+      "dest": "https://horoscope-app-ver2.onrender.com/api/$1"
     },
     {
-      "source": "/media/:path*",
-      "destination": "https://horoscope-app-ver2.onrender.com/media/:path*"
+      "src": "/media/(.*)",
+      "dest": "https://horoscope-app-ver2.onrender.com/media/$1"
     },
     {
-      "source": "/:path*",
-      "destination": "/index.html"
+      "handle": "filesystem"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
     }
   ]
 }
