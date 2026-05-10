@@ -5,11 +5,20 @@ function getCookie(name) {
   return "";
 }
 
+let csrfPromise = null;
+
 export async function ensureCsrf() {
-  await fetch("/api/csrf/", {
-    method: "GET",
-    credentials: "include",
-  });
+  if (!csrfPromise) {
+    csrfPromise = fetch("/api/csrf/", {
+      method: "GET",
+      credentials: "include",
+    }).catch((error) => {
+      csrfPromise = null;
+      throw error;
+    });
+  }
+
+  await csrfPromise;
 }
 
 export async function apiFetch(path, options = {}) {

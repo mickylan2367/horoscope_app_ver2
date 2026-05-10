@@ -1,623 +1,765 @@
-import { useMemo, useState } from "react";
+﻿import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { LucideHeading3, Sparkles } from "lucide-react";
+import { apiFetch } from "./api";
+import StarrySky from "./components/StarrySky.jsx";
+import { DiaryBookContent } from "./pages/DiaryBookPage.jsx";
+import { TarotReadingCards, TarotReadingContent, TarotReadingMessage } from "./pages/TarotPages.jsx";
 
-const seededRandom = (seed) => {
-  const x = Math.sin(seed) * 10000;
-  return x - Math.floor(x);
+const emptyForm = {
+  personName: "",
+  place: "",
+  birthDate: "",
+  birthTime: "",
 };
 
-export default function BookDesign() {
-  const [currentPage, setCurrentPage] = useState(0);
-  const starStyles = useMemo(
-    () =>
-      Array.from({ length: 110 }, (_, i) => {
-        const size = seededRandom(i + 1) * 3.5 + 1.2;
-        return {
-          width: `${size}px`,
-          height: `${size}px`,
-          top: `${seededRandom(i + 201) * 100}%`,
-          left: `${seededRandom(i + 401) * 100}%`,
-          opacity: seededRandom(i + 601) * 0.7 + 0.2,
-          boxShadow:
-            "0 0 8px rgba(255,255,255,0.95), 0 0 18px rgba(180,210,255,0.55), 0 0 28px rgba(181,120,255,0.25)",
-          animationDuration: `${seededRandom(i + 801) * 4 + 3}s`,
-          animationDelay: `${seededRandom(i + 1001) * 4}s`,
-        };
-      }),
-    [],
+const groupProfiles = (profiles) =>
+  profiles.reduce((groups, profile) => {
+    const first = (profile.personName || "#").charAt(0).toUpperCase();
+    const key = /[A-Z]/.test(first) ? first : "#";
+    return {
+      ...groups,
+      [key]: [...(groups[key] ?? []), profile],
+    };
+  }, {});
+
+const sortGroupedEntries = (groups) =>
+  Object.entries(groups).sort(([left], [right]) => {
+    if (left === "#") return 1;
+    if (right === "#") return -1;
+    return left.localeCompare(right);
+  });
+
+export default function BookDesign({ user }) {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [profilesData, setProfilesData] = useState({
+    publicProfiles: [],
+    privateProfiles: [],
+  });
+  const [form, setForm] = useState(emptyForm);
+  const [selectedProfile, setSelectedProfile] = useState(null);
+  const [result, setResult] = useState(null);
+  const [currentPage, setCurrentPage] = useState(() => location.state?.page ?? 0);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [isOpeningDiary, setIsOpeningDiary] = useState(false);
+  const [isOpeningTarot, setIsOpeningTarot] = useState(false);
+  const [pendingBookSection, setPendingBookSection] = useState(null);
+  const [diaryNavState, setDiaryNavState] = useState(null);
+  const [diaryInitialPageIndex, setDiaryInitialPageIndex] = useState(0);
+  const [diaryInitialSelectedDate, setDiaryInitialSelectedDate] = useState("");
+  const [tarotBookReading, setTarotBookReading] = useState(null);
+  const [tarotReturnToDiaryDate, setTarotReturnToDiaryDate] = useState("");
+
+  const isAuthenticated = Boolean(user);
+
+  useEffect(() => {
+    apiFetch("/api/chart/profiles/")
+      .then((data) => {
+        if (Array.isArray(data)) {
+          setProfilesData({ publicProfiles: data, privateProfiles: [] });
+          return;
+        }
+        setProfilesData({
+          publicProfiles: data.publicProfiles ?? [],
+          privateProfiles: isAuthenticated ? data.privateProfiles ?? [] : [],
+        });
+      })
+      .catch((err) => setError(err.message || "Failed to load profiles."));
+
+    if (!isAuthenticated) {
+      setForm(emptyForm);
+      setResult(null);
+      setCurrentPage(0);
+      setLoading(false);
+      setError("");
+    }
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    if (location.state?.bookSection === "tarot") {
+      setIsOpeningDiary(false);
+      setIsOpeningTarot(true);
+      setPendingBookSection(null);
+      setTarotReturnToDiaryDate("");
+      setCurrentPage(location.state?.tarotPage === "draw" ? 3 : 2);
+      return;
+    }
+
+    if (location.state?.bookSection === "diary") {
+      setIsOpeningTarot(false);
+      setIsOpeningDiary(true);
+      setPendingBookSection(null);
+      setDiaryInitialPageIndex(location.state?.diaryPage === "list" ? 1 : 0);
+      setDiaryInitialSelectedDate(location.state?.selectedDate ?? "");
+      setCurrentPage(2);
+      return;
+    }
+
+    if (typeof location.state?.page === "number") {
+      setCurrentPage(location.state.page);
+    }
+  }, [location.state?.bookSection, location.state?.diaryPage, location.state?.page, location.state?.selectedDate, location.state?.tarotPage]);
+
+  const publicGroupedEntries = useMemo(
+    () => sortGroupedEntries(groupProfiles(profilesData.publicProfiles)),
+    [profilesData.publicProfiles],
   );
 
-  const groupedProfiles = {
-    A: [
-      { id: 1, person_name: "Alice", birth_date: "1998-04-12" },
-      { id: 2, person_name: "Aria", birth_date: "2001-08-22" },
-    ],
-    H: [
-      { id: 3, person_name: "Hikari", birth_date: "1999-11-03" },
-      { id: 4, person_name: "Hoshino", birth_date: "2000-02-14" },
-    ],
-    M: [
-      { id: 5, person_name: "Mina", birth_date: "1997-07-09" },
-    ],
+  const privateGroupedEntries = useMemo(
+    () => sortGroupedEntries(groupProfiles(profilesData.privateProfiles)),
+    [profilesData.privateProfiles],
+  );
+
+  const update = (key) => (event) => {
+    setForm((current) => ({ ...current, [key]: event.target.value }));
   };
 
-  const pages = useMemo(
-    () => [
-      {
-        key: "index",
-        title: "Akashic Index",
-        subtitle: "Registered Profiles",
-        type: "index",
-      },
-      {
-        key: "form",
-        title: "✨ STAR TITLE ✨",
-        type: "form",
-      },
-      {
-        key: "record",
-        title: "RECORD",
-        type: "text",
-        body: `あなたの星は、静かに深い場所で光っています。
-表には見えにくくても、内側には確かな意志と感受性があります。
+  const refreshProfiles = useCallback(async () => {
+    const nextProfiles = await apiFetch("/api/chart/profiles/");
+    setProfilesData({
+      publicProfiles: nextProfiles.publicProfiles ?? [],
+      privateProfiles: nextProfiles.privateProfiles ?? [],
+    });
+  }, []);
 
-感情を派手に見せるよりも、物事をじっくり観察し、
-必要な瞬間にだけ力を使うような人です。
+  const openProfileForEdit = useCallback((profile) => {
+    setForm({
+      personName: profile.personName ?? "",
+      place: profile.place ?? "",
+      birthDate: profile.birthDate ?? "",
+      birthTime: profile.birthTime ?? "",
+    });
+    setSelectedProfile(profile);
+    setResult(null);
+    setError("");
+    setCurrentPage(4);
+  }, []);
 
-その静かな集中力が、人生の大きな転機で
-重要な導きになります。`,
-      },
-      {
-        key: "gift",
-        title: "GIFT",
-        type: "text",
-        body: `あなたの本質的な才能は、
-世界の流れを敏感に読み取ること。
+  const saveProfile = useCallback(async () => {
+    if (!isAuthenticated) {
+      return;
+    }
 
-曖昧な空気や、人の中にあるまだ言葉にならないものを
-直感的に感じ取る力があります。
+    setLoading(true);
+    setError("");
+    try {
+      const payload = {
+        personName: form.personName,
+        place: form.place,
+        birthDate: form.birthDate,
+        birthTime: form.birthTime,
+      };
 
-この力は、落ち着いた環境でこそ
-いちばん美しく発揮されます。`,
-      },
-      {
-        key: "geo-table",
-        title: "GEOCENTRIC",
-        type: "table",
-      },
-    ],
-    []
+      const endpoint = selectedProfile?.id
+        ? "/api/chart/profiles/update/"
+        : "/api/chart/profiles/create/";
+      const body = {
+        ...payload,
+        ...(selectedProfile?.id ? { profileId: selectedProfile.id } : {}),
+        ...(
+          selectedProfile &&
+          selectedProfile.place === form.place &&
+          selectedProfile.lat != null &&
+          selectedProfile.lon != null
+            ? { lat: selectedProfile.lat, lon: selectedProfile.lon }
+            : {}
+        ),
+      };
+
+      const savedProfile = await apiFetch(endpoint, {
+        method: "POST",
+        body: JSON.stringify(body),
+      });
+
+      setSelectedProfile(savedProfile);
+      setForm({
+        personName: savedProfile.personName ?? payload.personName,
+        place: savedProfile.place ?? payload.place,
+        birthDate: savedProfile.birthDate ?? payload.birthDate,
+        birthTime: savedProfile.birthTime ?? payload.birthTime,
+      });
+      await refreshProfiles();
+      setCurrentPage(4);
+    } catch (err) {
+      setError(err.message || "Failed to save profile.");
+    } finally {
+      setLoading(false);
+    }
+  }, [form.birthDate, form.birthTime, form.personName, form.place, isAuthenticated, refreshProfiles, selectedProfile]);
+
+  const calculate = useCallback(
+    async ({ includeAi = false, saveProfile = false, profileId = null } = {}) => {
+      if (!isAuthenticated && !profileId) {
+        return;
+      }
+
+      setLoading(true);
+      setError("");
+      try {
+        const payload = profileId
+          ? { profileId, includeAi, saveProfile }
+          : { ...form, includeAi, saveProfile };
+        const data = await apiFetch("/api/chart/calculate/", {
+          method: "POST",
+          body: JSON.stringify(payload),
+        });
+        setResult(data);
+        setCurrentPage(isAuthenticated ? 5 : 3);
+        if (saveProfile) {
+          await refreshProfiles();
+        }
+      } catch (err) {
+        setError(err.message || "Chart calculation failed.");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [form, isAuthenticated, refreshProfiles],
   );
 
-  const goPrev = () => setCurrentPage((p) => Math.max(0, p - 1));
-  const goNext = () => setCurrentPage((p) => Math.min(pages.length - 1, p + 1));
+  const closeAndLogout = useCallback(async () => {
+    if (isAuthenticated) {
+      await apiFetch("/api/auth/logout/", { method: "POST", body: "{}" });
+      navigate("/diary/warp", { state: { target: "/thank-you", reloadAfter: true, warpMode: "collapse" } });
+      return;
+    }
+
+    navigate("/diary/warp", { state: { target: "/" } });
+  }, [isAuthenticated, navigate]);
+
+  const openDiaryBook = useCallback(() => {
+    setIsOpeningDiary(true);
+    setIsOpeningTarot(false);
+    setTarotReturnToDiaryDate("");
+    setDiaryInitialPageIndex(0);
+    setDiaryInitialSelectedDate("");
+    setCurrentPage(1);
+    setPendingBookSection("diary");
+  }, []);
+
+  const openTarotIndex = useCallback(() => {
+    setIsOpeningTarot(true);
+    setIsOpeningDiary(false);
+    setTarotBookReading(null);
+    setTarotReturnToDiaryDate("");
+    setCurrentPage(1);
+    setPendingBookSection("tarot");
+  }, []);
+
+  const openAkashicIndex = useCallback(() => {
+    setIsOpeningDiary(false);
+    setIsOpeningTarot(false);
+    setPendingBookSection(null);
+    setTarotReturnToDiaryDate("");
+    setCurrentPage(2);
+  }, []);
+
+  const closeDiaryBook = useCallback(() => {
+    setIsOpeningDiary(false);
+    setDiaryNavState(null);
+    setCurrentPage(1);
+  }, []);
+
+  const closeTarotIndex = useCallback(() => {
+    setIsOpeningTarot(false);
+    setTarotBookReading(null);
+    setTarotReturnToDiaryDate("");
+    setCurrentPage(1);
+  }, []);
+
+  const returnToDiaryListFromTarot = useCallback(() => {
+    setIsOpeningTarot(false);
+    setTarotBookReading(null);
+    setTarotReturnToDiaryDate("");
+    setIsOpeningDiary(true);
+    setDiaryInitialPageIndex(1);
+    setDiaryInitialSelectedDate(tarotReturnToDiaryDate);
+    setCurrentPage(2);
+  }, [tarotReturnToDiaryDate]);
+
+  const openTarotReadingFromDiary = useCallback(async (entry) => {
+    const readingId = entry?.tarotReadingId;
+    if (!readingId) return;
+
+    setError("");
+    try {
+      const reading = await apiFetch(`/api/tarot/readings/${readingId}/`);
+      setTarotBookReading(reading);
+      setTarotReturnToDiaryDate(entry.date ?? "");
+      setIsOpeningDiary(false);
+      setDiaryNavState(null);
+      setIsOpeningTarot(true);
+      setPendingBookSection(null);
+      setCurrentPage(4);
+    } catch (err) {
+      setError(err.message || "Failed to load tarot reading.");
+    }
+  }, []);
+
+  const pages = useMemo(() => {
+    const items = [
+      {
+        key: "intro",
+        title: "Welcome to your Star Book",
+        content: (
+          <div className="guest-card">
+            <div className="guest-eyebrow">
+              <Sparkles className="h-4 w-4" />
+              <span>あなたの星の物語を、ひとつずつ開いていく。</span>
+            </div>
+            <h2 className="guest-subtitle">Horoscope & Sabian Symbol Reading</h2>
+            <p className="guest-text">
+              <br />
+              最初のページでは、ここで何が見えるのかをやさしく案内します。
+              <br />
+              On the first page, we gently guide you through what you can discover here.
+              <br />
+              その先には、誰でものぞける無料の Akashic Index。
+              <br />
+              Beyond that, you can explore the free Akashic Index that anyone can browse.
+              <br />
+              <br />
+              <br />
+              有名人の星の並びや、運命の輪の気配を、ページをめくるように楽しめます。
+              <br />
+              You can enjoy celebrity charts and the subtle hints of fate as if turning the pages of a storybook.
+              <br />
+              ログインすると、あなた自身の記録が加わり、保存したホロスコープや新しい星の読み解きを続けて開けます。
+              <br />
+              When you sign in, your own records appear, along with saved horoscopes and new readings that continue your journey through the stars.
+            </p>
+            <div className="guest-actions">
+              <button
+                type="button"
+                className="guest-button"
+                onClick={closeAndLogout}
+              >
+                CLOSE & LOGOUT
+              </button>
+            </div>
+          </div>
+        ),
+      },
+      {
+        key: "chooser",
+        title: "INDEX",
+        subtitle: "select page",
+        content: (
+          <div className="chooser-page">
+            <div className="chooser-grid">
+              <button
+                type="button"
+                className="chooser-card"
+                onClick={openAkashicIndex}
+              >
+                <div className="chooser-media" aria-hidden="true">
+                  <div className="chooser-media-frame chooser-media-chart">
+                    <div className="chooser-media-glow" />
+                    <div className="chooser-illustration chart-illustration">
+                      <span className="chart-orbit chart-orbit-outer" />
+                      <span className="chart-orbit chart-orbit-inner" />
+                      <span className="chart-dot chart-dot-one" />
+                      <span className="chart-dot chart-dot-two" />
+                      <span className="chart-dot chart-dot-three" />
+                    </div>
+                  </div>
+                </div>
+                <div className="chooser-copy">
+                  <div className="chooser-eyebrow">Chart</div>
+                  <h3>Open Akashic Index</h3>
+                  <p>
+                    Open the current chart app pages and the shared free index.
+                  </p>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                className="chooser-card"
+                onClick={openDiaryBook}
+              >
+                <div className="chooser-media" aria-hidden="true">
+                  <div className="chooser-media-frame chooser-media-diary">
+                    <div className="chooser-media-glow" />
+                    <div className="chooser-illustration diary-illustration">
+                      <span className="diary-book" />
+                      <span className="diary-ribbon" />
+                      <span className="diary-line diary-line-one" />
+                      <span className="diary-line diary-line-two" />
+                      <span className="diary-heart" />
+                    </div>
+                  </div>
+                </div>
+                <div className="chooser-copy">
+                  <div className="chooser-eyebrow">Diary</div>
+                  <h3>Open Diary Book</h3>
+                  <p>
+                    Move into the diary book with the calendar, list, and edit pages.
+                  </p>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                className="chooser-card"
+                onClick={openTarotIndex}
+              >
+                <div className="chooser-media" aria-hidden="true">
+                  <div className="chooser-media-frame chooser-media-tarot">
+                    <div className="chooser-media-glow" />
+                    <div className="chooser-illustration tarot-illustration">
+                      <span className="tarot-card tarot-card-back" />
+                      <span className="tarot-card tarot-card-front" />
+                      <span className="tarot-moon" />
+                      <span className="tarot-star tarot-star-one" />
+                      <span className="tarot-star tarot-star-two" />
+                    </div>
+                  </div>
+                </div>
+                <div className="chooser-copy">
+                  <div className="chooser-eyebrow">Tarot</div>
+                  <h3>Open Tarot Room</h3>
+                  <p>
+                    Enter the tarot app to draw cards, browse decks, and keep saved readings.
+                  </p>
+                </div>
+              </button>
+            </div>
+          </div>
+        ),
+      },
+      {
+        key: "public-index",
+        title: "SHARED AKASHIC INDEX",
+        subtitle: "notable people star charts",
+        content: (
+          <ProfileIndex
+            entries={publicGroupedEntries}
+            emptyMessage="No shared profiles are available yet."
+            interactive
+            onSelect={(profile) => calculate({ includeAi: true, profileId: profile.id })}
+          />
+        ),
+      },
+    ].filter(Boolean);
+
+    if (isAuthenticated) {
+      items.push(
+        {
+          key: "private-index",
+          title: "MY AKASHIC INDEX",
+          subtitle: "Your saved profiles",
+          content: (
+              <ProfileIndex
+                entries={privateGroupedEntries}
+                emptyMessage="No saved profiles yet."
+                interactive
+                onSelect={openProfileForEdit}
+              />
+            ),
+          },
+        {
+          key: "form",
+          title: "STAR TITLE",
+          content: (
+            <form
+              className="form-card"
+              onSubmit={(event) => {
+                event.preventDefault();
+                calculate({ includeAi: true });
+              }}
+            >
+              <div className="form-row">
+                <label htmlFor="person-name">Person Name</label>
+                <input
+                  id="person-name"
+                  type="text"
+                  value={form.personName}
+                  onChange={update("personName")}
+                  placeholder="Name"
+                />
+              </div>
+
+              <div className="form-row">
+                <label htmlFor="birth-place">Place</label>
+                <input
+                  id="birth-place"
+                  type="text"
+                  value={form.place}
+                  onChange={update("place")}
+                  placeholder="Birth place"
+                />
+              </div>
+
+              <div className="form-row">
+                <label htmlFor="birth-date">Birth Date</label>
+                <input
+                  id="birth-date"
+                  type="date"
+                  value={form.birthDate}
+                  onChange={update("birthDate")}
+                  required
+                />
+              </div>
+
+              <div className="form-row">
+                <label htmlFor="birth-time">Birth Time</label>
+                <input
+                  id="birth-time"
+                  type="time"
+                  value={form.birthTime}
+                  onChange={update("birthTime")}
+                />
+              </div>
+
+              <div className="form-actions">
+                <button
+                  className="secondary-btn"
+                  type="button"
+                  onClick={saveProfile}
+                  disabled={loading}
+                >
+                  {selectedProfile?.id ? "Update" : "Save"}
+                </button>
+                <button className="primary-btn" type="submit" disabled={loading}>
+                  {loading ? "Opening..." : "Open"}
+                </button>
+              </div>
+            </form>
+          ),
+        },
+      );
+    }
+
+    if (result?.aiTextGeo) {
+      items.push({
+        key: "record",
+        title: "RECORD",
+        content: <div className="reading-body">{result.aiTextGeo}</div>,
+      });
+    }
+
+    if (result?.aiTextHelio) {
+      items.push({
+        key: "gift",
+        title: "GIFT",
+        content: <div className="reading-body">{result.aiTextHelio}</div>,
+      });
+    }
+
+    if (result?.chartGeoUrl) {
+      items.push({
+        key: "chart",
+        title: "GEOCENTRIC",
+        content: (
+          <div className="reading-body">
+            <div className="chart-box">
+              <img src={result.chartGeoUrl} alt="Horoscope chart" />
+            </div>
+          </div>
+        ),
+      });
+    }
+
+    if (result?.resultGeo) {
+      items.push({
+        key: "geo",
+        title: "GEOCENTRIC",
+        content: <ResultTable rows={result.resultGeo} type="geo" />,
+      });
+    }
+
+    if (result?.resultHelio) {
+      items.push({
+        key: "helio",
+        title: "HELIOCENTRIC",
+        content: <ResultTable rows={result.resultHelio} type="helio" />,
+      });
+    }
+
+    if (isOpeningDiary) {
+      items.splice(2, 0, {
+        key: "diary-book",
+        title: "DIARY CALENDAR",
+        subtitle: "Diary / Calendar",
+        content: (
+          <div className="book-diary-content">
+            <DiaryBookContent
+              authReady
+              embedded
+              initialPageIndex={diaryInitialPageIndex}
+              initialSelectedDate={diaryInitialSelectedDate}
+              onExitToBook={closeDiaryBook}
+              onOpenTarotReading={openTarotReadingFromDiary}
+              onPageStateChange={setDiaryNavState}
+            />
+          </div>
+        ),
+      });
+    }
+
+    if (isOpeningTarot) {
+      items.splice(2, 0, {
+        key: "tarot-index",
+        title: "TAROT INDEX",
+        subtitle: "select tarot page",
+        content: (
+          <div className="tarot-index-page">
+            <button type="button" className="tarot-index-card" onClick={() => {
+              setTarotBookReading(null);
+              setTarotReturnToDiaryDate("");
+              setCurrentPage(3);
+            }}>
+              <span className="tarot-index-art tarot-index-art-reading" aria-hidden="true">
+                <span className="tarot-art-card tarot-art-card-one" />
+                <span className="tarot-art-card tarot-art-card-two" />
+                <span className="tarot-art-moon" />
+                <span className="tarot-art-face" />
+                <span className="tarot-art-bow tarot-art-bow-reading" />
+                <span className="tarot-art-spark tarot-art-spark-one" />
+                <span className="tarot-art-spark tarot-art-spark-two" />
+              </span>
+              <span className="tarot-index-kicker">Reading</span>
+              <strong>Draw Cards</strong>
+              <span>Open a tarot reading and save the result.</span>
+            </button>
+            <button type="button" className="tarot-index-card" onClick={() => navigate("/tarot/decks")}>
+              <span className="tarot-index-art tarot-index-art-decks" aria-hidden="true">
+                <span className="tarot-art-stack tarot-art-stack-one" />
+                <span className="tarot-art-stack tarot-art-stack-two" />
+                <span className="tarot-art-stack tarot-art-stack-three" />
+                <span className="tarot-art-gem" />
+                <span className="tarot-art-bow tarot-art-bow-decks" />
+                <span className="tarot-art-spark tarot-art-spark-three" />
+              </span>
+              <span className="tarot-index-kicker">Decks</span>
+              <strong>Card Library</strong>
+              <span>Browse and edit tarot decks and cards.</span>
+            </button>
+          </div>
+        ),
+      });
+      items.splice(3, 0, {
+        key: "tarot-read",
+        title: "TAROT DRAW",
+        subtitle: "draw cards",
+        content: (
+          <div className="book-tarot-reading-content">
+            <TarotReadingContent
+              embedded
+              showResultPanel={false}
+              onReadingComplete={(reading) => {
+                setTarotBookReading(reading);
+                setCurrentPage(4);
+              }}
+            />
+          </div>
+        ),
+      });
+      items.splice(4, 0, {
+        key: "tarot-cards",
+        title: "TAROT CARDS",
+        subtitle: "drawn cards",
+        content: (
+          <div className="book-tarot-result-content">
+            {tarotBookReading ? (
+              <TarotReadingCards result={tarotBookReading} />
+            ) : (
+              <p className="rounded-xl border border-white/10 bg-white/8 px-4 py-3 text-sm text-slate-200">Your reading will appear here.</p>
+            )}
+          </div>
+        ),
+      });
+      items.splice(5, 0, {
+        key: "tarot-message",
+        title: "TAROT MESSAGE",
+        subtitle: "witch's reading",
+        content: (
+          <div className="book-tarot-result-content">
+            {tarotBookReading ? (
+              <>
+                <div className="book-tarot-message-scroll">
+                  <TarotReadingMessage result={tarotBookReading} />
+                </div>
+              </>
+            ) : (
+              <p className="rounded-xl border border-white/10 bg-white/8 px-4 py-3 text-sm text-slate-200">Your reading will appear here.</p>
+            )}
+          </div>
+        ),
+      });
+      items.splice(6, 0, {
+        key: "tarot-consult",
+        title: "TAROT CONSULT",
+        subtitle: "talk with the reading",
+        content: (
+          <div className="book-tarot-result-content book-tarot-consult-content">
+            <TarotConsultPanel reading={tarotBookReading} onBackToMessage={() => setCurrentPage(5)} />
+          </div>
+        ),
+      });
+    }
+
+    return items;
+  }, [
+    calculate,
+    closeAndLogout,
+    closeDiaryBook,
+    form.birthDate,
+    form.birthTime,
+    form.personName,
+    form.place,
+    isAuthenticated,
+    isOpeningDiary,
+    isOpeningTarot,
+    diaryInitialPageIndex,
+    diaryInitialSelectedDate,
+    loading,
+    navigate,
+    openAkashicIndex,
+    openDiaryBook,
+    openTarotReadingFromDiary,
+    openTarotIndex,
+    privateGroupedEntries,
+    publicGroupedEntries,
+    openProfileForEdit,
+    result,
+    saveProfile,
+    selectedProfile,
+    tarotBookReading,
+  ]);
+
+  const pageCount = pages.length;
+
+  useEffect(() => {
+    setCurrentPage((current) => Math.min(current, pageCount - 1));
+  }, [pageCount]);
+
+  useEffect(() => {
+    if (!pendingBookSection) return undefined;
+
+    const frameId = window.requestAnimationFrame(() => {
+      setCurrentPage(2);
+      setPendingBookSection(null);
+    });
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+    };
+  }, [pendingBookSection]);
 
   return (
     <>
-      <style>{`
-        * {
-          box-sizing: border-box;
-        }
+      <style>{sharedStyles}</style>
 
-        html, body, #root {
-          margin: 0;
-          min-height: 100%;
-          font-family: "Segoe UI", "Hiragino Sans", "Yu Gothic UI", sans-serif;
-          background:
-            radial-gradient(circle at 15% 20%, rgba(196, 136, 255, 0.18), transparent 26%),
-            radial-gradient(circle at 82% 16%, rgba(126, 214, 255, 0.16), transparent 24%),
-            radial-gradient(circle at 50% 80%, rgba(117, 138, 255, 0.14), transparent 28%),
-            linear-gradient(180deg, #161b2d 0%, #252b46 45%, #32385a 100%);
-          color: #f2f4ff;
-        }
+      <div className={`app-shell ${isOpeningDiary ? "app-shell-diary-opening" : ""}`}>
+        {error ? <div className="chart-error">{error}</div> : null}
 
-        body{
-        
-        }
-
-        .app-shell {
-          position: relative;
-          min-height: 100vh;
-          overflow: hidden;
-        }
-
-        .star-layer {
-          position: absolute;
-          inset: 0;
-          pointer-events: none;
-          overflow: hidden;
-        }
-
-        .star {
-          position: absolute;
-          border-radius: 999px;
-          background: white;
-          animation: twinkle ease-in-out infinite;
-        }
-
-        .shooting-star {
-          position: absolute;
-          width: 150px;
-          height: 2px;
-          border-radius: 999px;
-          background: linear-gradient(
-            90deg,
-            rgba(255,255,255,0),
-            rgba(255,255,255,0.95),
-            rgba(255,255,255,0)
-          );
-          opacity: 0;
-          transform: rotate(-26deg);
-          filter:
-            drop-shadow(0 0 6px rgba(255,255,255,0.95))
-            drop-shadow(0 0 16px rgba(197, 225, 255, 0.65))
-            drop-shadow(0 0 26px rgba(184, 128, 255, 0.40));
-          animation: shooting ease-in-out infinite;
-        }
-
-        .shooting-star::after {
-          content: "";
-          position: absolute;
-          right: -2px;
-          top: 50%;
-          width: 10px;
-          height: 10px;
-          border-radius: 999px;
-          background: white;
-          transform: translateY(-50%);
-          box-shadow:
-            0 0 10px rgba(255,255,255,1),
-            0 0 20px rgba(255,255,255,0.75),
-            0 0 34px rgba(115, 206, 255, 0.55);
-        }
-
-        @keyframes twinkle {
-          0%, 100% {
-            opacity: 0.25;
-            transform: scale(0.85);
-          }
-          50% {
-            opacity: 1;
-            transform: scale(1.55);
-          }
-        }
-
-        @keyframes shooting {
-          0% {
-            opacity: 0;
-            transform: rotate(-26deg) translate3d(0, 0, 0);
-          }
-          10% {
-            opacity: 1;
-          }
-          35% {
-            opacity: 1;
-            transform: rotate(-26deg) translate3d(420px, 180px, 0);
-          }
-          100% {
-            opacity: 0;
-            transform: rotate(-26deg) translate3d(720px, 310px, 0);
-          }
-        }
-
-        .page-wrap {
-          position: relative;
-          z-index: 1;
-          min-height: 100%;
-          width: 100%;
-          margin: 0;
-          display: flex;
-          flex-direction: column;
-        }
-
-        .book-shell {
-          width: min(760px, calc(100vw - 28px));
-          height: calc(100vh - 80px);
-          margin: 18px auto 24px;
-          padding-top: 4px;
-          display: flex;
-          flex-direction: column;
-          perspective: 1600px;
-          position: relative;
-          overflow: hidden;
-        }
-
-        .book {
-          position: relative;
-          flex: 1;
-          min-height: 0;
-          width: 100%;
-        }
-
-        .book::before {
-          content: "";
-          position: absolute;
-          top: 0;
-          bottom: 0;
-          left: 0;
-          width: 34px;
-          z-index: 3;
-          border-radius: 8px;
-          background:
-            radial-gradient(circle at 10% 10%, #ffffff 1px, transparent 2px),
-            radial-gradient(circle at 25% 25%, #aeefff 1.5px, transparent 3px),
-            radial-gradient(circle at 40% 15%, #ffd6ff 2px, transparent 4px),
-            radial-gradient(circle at 60% 30%, #ffffff 1px, transparent 2px),
-            radial-gradient(circle at 80% 20%, #c8b6ff 1.5px, transparent 3px),
-            radial-gradient(circle at 15% 60%, #ffffff 2px, transparent 4px),
-            radial-gradient(circle at 35% 75%, #aeefff 1px, transparent 2px),
-            radial-gradient(circle at 55% 85%, #ffd6ff 1.5px, transparent 3px),
-            radial-gradient(circle at 75% 70%, #ffffff 2px, transparent 4px),
-            radial-gradient(circle at 90% 50%, #c8b6ff 1px, transparent 2px),
-            linear-gradient(to bottom, rgba(120,150,255,0.42), rgba(180,120,255,0.62));
-          box-shadow:
-            0 0 12px rgba(140, 160, 255, 0.55),
-            inset 0 0 6px rgba(255,255,255,0.2);
-          animation: spineSparkle 3s ease-in-out infinite alternate;
-        }
-
-        .book::after {
-          content: "";
-          position: absolute;
-          left: 27px;
-          top: 0;
-          bottom: 0;
-          width: 10px;
-          background: linear-gradient(to right, rgba(0,0,0,0.22), rgba(255,255,255,0.10));
-          z-index: 3;
-        }
-
-        @keyframes spineSparkle {
-          0% {
-            opacity: 0.65;
-            filter: brightness(0.92);
-          }
-          100% {
-            opacity: 1;
-            filter: brightness(1.28);
-          }
-        }
-
-        .page {
-          position: absolute;
-          inset: 0;
-          padding: 36px 44px 88px 48px;
-          margin-left: 18px;
-          border-radius: 22px;
-          background:
-            radial-gradient(circle at top left, rgba(143, 168, 255, 0.10), transparent 26%),
-            linear-gradient(135deg, #1f2238, #2a2f4d);
-          color: #f5f7ff;
-          box-shadow:
-            0 14px 34px rgba(0,0,0,0.28),
-            inset 0 1px 0 rgba(255,255,255,0.04);
-          border: 1px solid rgba(255,255,255,0.06);
-          transform-origin: left center;
-          backface-visibility: hidden;
-          transition: transform 0.8s ease, opacity 0.45s ease;
-          display: flex;
-          flex-direction: column;
-          overflow: hidden;
-        }
-
-        .page.hidden {
-          opacity: 0;
-          pointer-events: none;
-          transform: rotateY(-100deg);
-        }
-
-        .page.active {
-          opacity: 1;
-          transform: rotateY(0deg);
-          z-index: 2;
-        }
-
-        .page::after {
-          content: "";
-          position: absolute;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          height: 42px;
-          background: linear-gradient(to bottom, transparent, rgba(28, 31, 52, 0.9));
-          pointer-events: none;
-        }
-
-        .reading-title {
-          margin: 0 0 12px;
-          padding-left: 12px;
-          border-left: 4px solid #8fa8ff;
-          font-size: 24px;
-          font-weight: 700;
-          letter-spacing: 0.08em;
-          color: #f7f8ff;
-          text-shadow: 0 0 10px rgba(180, 190, 255, 0.24);
-          flex-shrink: 0;
-        }
-
-        .reading-subtitle {
-          margin: 0 0 18px;
-          padding-left: 12px;
-          font-size: 13px;
-          letter-spacing: 0.16em;
-          color: rgba(220, 228, 255, 0.72);
-          text-transform: uppercase;
-          flex-shrink: 0;
-        }
-
-        .index-book-page {
-          height: 100%;
-          min-height: 0;
-          display: flex;
-          flex-direction: column;
-          padding: 8px 10px 0;
-          border-radius: 18px;
-          background: rgba(255,255,255,0.03);
-          backdrop-filter: blur(4px);
-        }
-
-        .index-body,
-        .reading-body {
-          flex: 1;
-          min-height: 0;
-          overflow-y: auto;
-          scrollbar-width: none;
-          -ms-overflow-style: none;
-        }
-
-        .index-body::-webkit-scrollbar,
-        .reading-body::-webkit-scrollbar {
-          display: none;
-        }
-
-        .index-group {
-          margin-bottom: 28px;
-        }
-
-        .index-letter {
-          margin: 0 0 12px;
-          padding-bottom: 6px;
-          font-size: 22px;
-          font-weight: 600;
-          color: #d9deff;
-          border-bottom: 1px solid rgba(180, 190, 255, 0.22);
-          text-shadow: 0 0 8px rgba(170, 180, 255, 0.18);
-        }
-
-        .index-list {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-          gap: 10px 18px;
-        }
-
-        .index-name-btn {
-          width: 100%;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 12px;
-          padding: 10px 14px;
-          border: 1px solid rgba(180, 190, 255, 0.16);
-          border-radius: 12px;
-          background: rgba(255, 255, 255, 0.04);
-          color: #f5f7ff;
-          cursor: pointer;
-          transition: transform 0.2s ease, background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
-          text-align: left;
-          backdrop-filter: blur(3px);
-        }
-
-        .index-name-btn:hover {
-          transform: translateY(-1px);
-          background: rgba(255,255,255,0.08);
-          border-color: rgba(190, 200, 255, 0.34);
-          box-shadow: 0 6px 18px rgba(60, 80, 170, 0.18);
-        }
-
-        .index-name {
-          font-size: 15px;
-          font-weight: 500;
-          color: #ffffff;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-        }
-
-        .index-meta {
-          flex-shrink: 0;
-          font-size: 12px;
-          color: rgba(215, 222, 255, 0.65);
-        }
-
-        .form-card {
-          flex: 1;
-          min-height: 0;
-          display: flex;
-          flex-direction: column;
-          gap: 12px;
-          padding-top: 10px;
-        }
-
-        .form-row {
-          display: grid;
-          grid-template-columns: 130px 1fr;
-          align-items: center;
-          gap: 16px;
-        }
-
-        .form-row label {
-          font-size: 16px;
-          font-weight: 600;
-          color: #ffffff;
-        }
-
-        .form-row input {
-          width: 100%;
-          padding: 12px 14px;
-          border: 1px solid rgba(255,255,255,0.08);
-          border-radius: 12px;
-          background: rgba(255,255,255,0.14);
-          color: #ffffff;
-          font-size: 15px;
-        }
-
-        .form-row input:focus {
-          outline: none;
-          border-color: #8fa8ff;
-          box-shadow: 0 0 0 3px rgba(143, 168, 255, 0.18);
-        }
-
-        .form-actions {
-          margin-top: auto;
-          display: flex;
-          justify-content: flex-end;
-          gap: 12px;
-          padding-top: 20px;
-        }
-
-        .form-actions button,
-        .book-nav button {
-          border: none;
-          border-radius: 14px;
-          cursor: pointer;
-          color: white;
-          font-size: 16px;
-          font-weight: 600;
-          transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
-        }
-
-        .form-actions button:hover,
-        .book-nav button:hover {
-          transform: translateY(-1px);
-        }
-
-        .primary-btn {
-          padding: 12px 20px;
-          background: linear-gradient(135deg, #7f8cff, #97a8ff);
-          box-shadow: 0 6px 18px rgba(127, 140, 255, 0.28);
-        }
-
-        .secondary-btn {
-          padding: 12px 20px;
-          background: rgba(255,255,255,0.12);
-          color: #f5f7ff;
-          border: 1px solid rgba(255,255,255,0.08);
-        }
-
-        .reading-body {
-          white-space: pre-wrap;
-          line-height: 1.9;
-          font-size: 16px;
-          padding: 4px 6px 14px 18px;
-          color: rgba(245,247,255,0.93);
-          text-align: justify;
-        }
-
-        .result-table {
-          width: 100%;
-          border-collapse: collapse;
-          margin-top: 4px;
-        }
-
-        .result-table th,
-        .result-table td {
-          border-bottom: 1px solid rgba(255,255,255,0.16);
-          padding: 10px;
-          text-align: center;
-          word-break: break-word;
-        }
-
-        .result-table th {
-          background: rgba(255,255,255,0.08);
-          font-weight: 500;
-        }
-
-        .book-nav {
-          position: absolute;
-          left: 46px;
-          right: 10px;
-          bottom: 24px;
-          display: flex;
-          justify-content: space-between;
-          pointer-events: none;
-          z-index: 10;
-        }
-
-        .book-nav button {
-          pointer-events: auto;
-          width: 52px;
-          height: 52px;
-          border-radius: 999px;
-          background: linear-gradient(135deg, #7f8cff, #97a8ff);
-          box-shadow: 0 8px 20px rgba(0,0,0,0.25);
-          font-size: 22px;
-        }
-
-        .book-nav button:disabled {
-          opacity: 0.25;
-          cursor: default;
-          transform: none;
-        }
-
-        .footer {
-          text-align: center;
-          padding: 0 16px 18px;
-          color: #c3c7ff;
-          opacity: 0.72;
-          font-size: 14px;
-        }
-
-        @media (max-width: 760px) {
-          .book-shell {
-            width: calc(100vw - 18px);
-            height: calc(100vh - 100px);
-          }
-
-          .page {
-            padding: 26px 20px 88px 28px;
-            margin-left: 12px;
-          }
-
-          .form-row {
-            grid-template-columns: 1fr;
-            gap: 8px;
-          }
-
-          .reading-title {
-            font-size: 21px;
-          }
-
-          .index-list {
-            grid-template-columns: 1fr;
-          }
-
-          .book-nav {
-            left: 26px;
-          }
-        }
-      `}</style>
-
-      <div className="app-shell">
-        <div className="star-layer">
-          {starStyles.map((style, i) => (
-            <span key={i} className="star" style={style} />
-          ))}
-
-          {Array.from({ length: 4 }).map((_, i) => (
-            <span
-              key={`shooting-${i}`}
-              className="shooting-star"
-              style={{
-                top: `${12 + i * 18}%`,
-                left: `${-20 + i * 4}%`,
-                animationDelay: `${i * 3.5}s`,
-                animationDuration: `${10 + i * 1.2}s`,
-              }}
-            />
-          ))}
-        </div>
+        <StarrySky className="book-starry-sky" tone="warm" shootingAngle={-18} />
 
         <div className="page-wrap">
-
           <div className="book-shell">
             <div className="book">
               {pages.map((page, index) => (
@@ -626,122 +768,2209 @@ export default function BookDesign() {
                   className={`page ${index === currentPage ? "active" : "hidden"}`}
                 >
                   <h2 className="reading-title">{page.title}</h2>
-                  {page.subtitle && (
-                    <p className="reading-subtitle">{page.subtitle}</p>
-                  )}
-
-                  {page.type === "index" && (
-                    <div className="index-book-page">
-                      <div className="index-body">
-                        {Object.entries(groupedProfiles).map(([initial, items]) => (
-                          <section className="index-group" key={initial}>
-                            <h3 className="index-letter">{initial}</h3>
-                            <div className="index-list">
-                              {items.map((p) => (
-                                <button className="index-name-btn" key={p.id} type="button">
-                                  <span className="index-name">{p.person_name}</span>
-                                  <span className="index-meta">{p.birth_date}</span>
-                                </button>
-                              ))}
-                            </div>
-                          </section>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {page.type === "form" && (
-                    <div className="form-card">
-                      <div className="form-row">
-                        <label>Person Name</label>
-                        <input type="text" placeholder="Name" />
-                      </div>
-
-                      <div className="form-row">
-                        <label>Place</label>
-                        <input type="text" placeholder="Birth place" />
-                      </div>
-
-                      <div className="form-row">
-                        <label>Birth Date</label>
-                        <input type="date" />
-                      </div>
-
-                      <div className="form-row">
-                        <label>Birth Time</label>
-                        <input type="time" />
-                      </div>
-
-                      <div className="form-actions">
-                        <button className="secondary-btn" type="button">Save</button>
-                        <button className="primary-btn" type="button">Open</button>
-                      </div>
-                    </div>
-                  )}
-
-                  {page.type === "text" && (
-                    <div className="reading-body">{page.body}</div>
-                  )}
-
-                  {page.type === "table" && (
-                    <div className="reading-body">
-                      <table className="result-table">
-                        <thead>
-                          <tr>
-                            <th>天体</th>
-                            <th>Meaning</th>
-                            <th>サイン</th>
-                            <th>年齢</th>
-                            <th>サビアンシンボル</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          <tr>
-                            <td>Sun</td>
-                            <td>Self</td>
-                            <td>Aries 12°</td>
-                            <td>24</td>
-                            <td>A triangularly shaped flight of wild geese</td>
-                          </tr>
-                          <tr>
-                            <td>Moon</td>
-                            <td>Emotion</td>
-                            <td>Libra 4°</td>
-                            <td>18</td>
-                            <td>A group around a campfire</td>
-                          </tr>
-                          <tr>
-                            <td>Mercury</td>
-                            <td>Mind</td>
-                            <td>Scorpio 21°</td>
-                            <td>13</td>
-                            <td>Obeying the call of duty</td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
+                  {page.subtitle ? <p className="reading-subtitle">{page.subtitle}</p> : null}
+                  {page.content}
                 </section>
               ))}
 
-              <div className="book-nav">
-                <button onClick={goPrev} disabled={currentPage === 0} type="button">
-                  ←
-                </button>
-                <button
-                  onClick={goNext}
-                  disabled={currentPage === pages.length - 1}
-                  type="button"
-                >
-                  →
-                </button>
-              </div>
+              {isOpeningDiary ? (
+                <div className="book-nav">
+                  <button
+                    onClick={diaryNavState?.goBack ?? closeDiaryBook}
+                    disabled={!diaryNavState?.goBack}
+                    type="button"
+                  >
+                    {"<"}
+                  </button>
+                  {diaryNavState?.goForward ? (
+                    <button
+                      onClick={diaryNavState.goForward}
+                      type="button"
+                    >
+                      {">"}
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
+
+              {isOpeningTarot ? (
+                <div className="book-nav">
+                  <button
+                    onClick={() => {
+                      if (currentPage === 4 && tarotReturnToDiaryDate) {
+                        returnToDiaryListFromTarot();
+                        return;
+                      }
+                      if (currentPage > 2) {
+                        setCurrentPage((page) => page - 1);
+                        return;
+                      }
+                      closeTarotIndex();
+                    }}
+                    type="button"
+                  >
+                    {"<"}
+                  </button>
+                  {currentPage === 2 ? (
+                    <button onClick={() => setCurrentPage(3)} type="button">
+                      {">"}
+                    </button>
+                  ) : null}
+                  {(currentPage === 3 || currentPage === 4 || currentPage === 5) && tarotBookReading ? (
+                    <button onClick={() => setCurrentPage((page) => page + 1)} type="button">
+                      {">"}
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
+
+              {!isOpeningDiary && !isOpeningTarot ? (
+                <div className="book-nav">
+                  <button
+                    onClick={() => setCurrentPage((page) => Math.max(0, page - 1))}
+                    disabled={currentPage === 0}
+                    type="button"
+                  >
+                    {"<"}
+                  </button>
+                  <button
+                    onClick={() =>
+                      setCurrentPage((page) => Math.min(pageCount - 1, page + 1))
+                    }
+                    disabled={currentPage === pageCount - 1}
+                    type="button"
+                  >
+                    {">"}
+                  </button>
+                </div>
+              ) : null}
             </div>
           </div>
 
-          <footer className="footer">© 2025 Horoscope App</footer>
+          <footer className="footer">@2025 Horoscope App</footer>
         </div>
       </div>
     </>
   );
 }
+
+function TarotConsultPanel({ reading, onBackToMessage }) {
+  const initialMessages = useMemo(() => [
+    {
+      role: "assistant",
+      content: "Ask about this saved reading. I will stay close to the cards, the question, and the message already on the page.",
+    },
+  ], []);
+  const [messages, setMessages] = useState([
+    {
+      role: "assistant",
+      content: "Ask about this saved reading. I will stay close to the cards, the question, and the message already on the page.",
+    },
+  ]);
+  const [input, setInput] = useState("");
+  const [sending, setSending] = useState(false);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!reading?.id) {
+      setMessages(initialMessages);
+      return undefined;
+    }
+
+    let active = true;
+    setLoadingHistory(true);
+    setError("");
+    apiFetch(`/api/tarot/readings/${reading.id}/consult/`)
+      .then((data) => {
+        if (!active) return;
+        setMessages(data.messages?.length ? data.messages : initialMessages);
+      })
+      .catch((err) => {
+        if (!active) return;
+        setMessages(initialMessages);
+        setError(err.message || "Could not load the consult history.");
+      })
+      .finally(() => {
+        if (active) setLoadingHistory(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [initialMessages, reading?.id]);
+
+  const sendMessage = async (event) => {
+    event.preventDefault();
+    const message = input.trim();
+    if (!message || !reading?.id || sending) return;
+
+    setMessages((current) => [...current, { role: "user", content: message }]);
+    setInput("");
+    setError("");
+    setSending(true);
+    try {
+      const data = await apiFetch(`/api/tarot/readings/${reading.id}/consult/`, {
+        method: "POST",
+        body: JSON.stringify({ message }),
+      });
+      setMessages(data.messages?.length ? data.messages : (current) => [...current, { role: "assistant", content: data.reply }]);
+    } catch (err) {
+      setError(err.message || "Could not open the consult.");
+    } finally {
+      setSending(false);
+    }
+  };
+
+  if (!reading) {
+    return (
+      <div className="tarot-consult-empty">
+        <p>Draw cards first, then the consult page can open around that saved reading.</p>
+        <button type="button" onClick={onBackToMessage}>Back to message</button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="tarot-consult-panel">
+      <div className="tarot-consult-summary">
+        <div>
+          <p className="tarot-consult-kicker">{reading.spreadType}</p>
+          <h3>{reading.question || "Untitled reading"}</h3>
+        </div>
+        <button type="button" onClick={onBackToMessage}>Message</button>
+      </div>
+
+      <div className="tarot-consult-messages" aria-live="polite">
+        {loadingHistory ? <div className="tarot-consult-message tarot-consult-message-assistant">Loading previous consult...</div> : null}
+        {messages.map((message, index) => (
+          <div className={`tarot-consult-message tarot-consult-message-${message.role}`} key={message.id ?? `${message.role}-${index}`}>
+            {message.content}
+          </div>
+        ))}
+        {sending ? <div className="tarot-consult-message tarot-consult-message-assistant">Listening to the reading...</div> : null}
+      </div>
+
+      {error ? <p className="tarot-consult-error">{error}</p> : null}
+
+      <form className="tarot-consult-form" onSubmit={sendMessage}>
+        <textarea
+          value={input}
+          onChange={(event) => setInput(event.target.value)}
+          placeholder="Ask about this reading"
+          rows={3}
+        />
+        <button type="submit" disabled={!input.trim() || sending}>
+          {sending ? "SENDING..." : "SEND"}
+        </button>
+      </form>
+    </div>
+  );
+}
+
+function ProfileIndex({ entries, emptyMessage, interactive = false, onSelect, note }) {
+  return (
+    <div className="index-book-page">
+      {note ? <p className="index-note">{note}</p> : null}
+      <div className="index-body">
+        {entries.length === 0 ? (
+          <p className="reading-muted">{emptyMessage}</p>
+        ) : (
+          entries.map(([initial, items]) => (
+            <section className="index-group" key={initial}>
+              <h3 className="index-letter">{initial}</h3>
+              <div className="index-list">
+                {items.map((profile) =>
+                  interactive ? (
+                    <button
+                      className="index-name-btn"
+                      key={profile.id}
+                      type="button"
+                      disabled={!interactive}
+                      onClick={() => onSelect?.(profile)}
+                    >
+                      <span className="index-name">{profile.personName}</span>
+                      <span className="index-meta">{profile.birthDate}</span>
+                    </button>
+                  ) : (
+                    <div className="index-name-btn index-name-btn-static" key={profile.id}>
+                      <span className="index-name">{profile.personName}</span>
+                      <span className="index-meta">{profile.birthDate}</span>
+                    </div>
+                  ),
+                )}
+              </div>
+            </section>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ResultTable({ rows, type }) {
+  return (
+    <div className="reading-body">
+      <table className="result-table">
+        <thead>
+          <tr>
+            <th>Planet</th>
+            <th>Meaning</th>
+            <th>Sign</th>
+            <th>Degree</th>
+            <th>Sabian</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, index) => (
+            <tr key={`${row[0]}-${index}`}>
+              {type === "geo" ? (
+                <>
+                  <td>{row[0]}</td>
+                  <td>{row[6]}</td>
+                  <td>
+                    {row[1]} {row[2]}
+                  </td>
+                  <td>{row[5]}</td>
+                  <td>{row[4]}</td>
+                </>
+              ) : (
+                <>
+                  <td>{row[0]}</td>
+                  <td>{row[4]}</td>
+                  <td>{row[1]}</td>
+                  <td>{row[2]}</td>
+                  <td>{row[3]}</td>
+                </>
+              )}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+const sharedStyles = `
+  * {
+    box-sizing: border-box;
+  }
+
+  html, body, #root {
+    margin: 0;
+    min-height: 100%;
+    font-family: "Segoe UI", "Hiragino Sans", "Yu Gothic UI", sans-serif;
+    background:
+      radial-gradient(circle at 15% 20%, rgba(196, 136, 255, 0.18), transparent 26%),
+      radial-gradient(circle at 82% 16%, rgba(126, 214, 255, 0.16), transparent 24%),
+      radial-gradient(circle at 50% 80%, rgba(117, 138, 255, 0.14), transparent 28%),
+      linear-gradient(180deg, #161b2d 0%, #252b46 45%, #32385a 100%);
+    color: #f2f4ff;
+  }
+
+  .app-shell {
+    position: relative;
+    min-height: calc(100vh - 81px);
+    overflow: hidden;
+    background:
+      radial-gradient(circle at 15% 20%, rgba(196, 136, 255, 0.18), transparent 26%),
+      radial-gradient(circle at 82% 16%, rgba(126, 214, 255, 0.16), transparent 24%),
+      radial-gradient(circle at 50% 80%, rgba(117, 138, 255, 0.14), transparent 28%),
+      linear-gradient(180deg, #161b2d 0%, #252b46 45%, #32385a 100%);
+    transition: background 720ms ease, filter 720ms ease;
+  }
+
+  .app-shell::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(circle at 17% 18%, rgba(151, 91, 218, 0.16), transparent 24%),
+      radial-gradient(circle at 78% 18%, rgba(255, 147, 97, 0.13), transparent 22%),
+      radial-gradient(circle at 42% 78%, rgba(190, 73, 104, 0.12), transparent 26%),
+      linear-gradient(180deg, rgba(5, 7, 18, 0.34), rgba(5, 7, 18, 0.94));
+    opacity: 0;
+    transition: opacity 720ms ease;
+    z-index: 0;
+  }
+
+  .app-shell-diary-opening::before {
+    opacity: 1;
+  }
+
+  .app-shell-diary-opening .book-starry-sky {
+    opacity: 0.88;
+    transition: opacity 720ms ease;
+  }
+
+  .page-wrap {
+    position: relative;
+    z-index: 1;
+    min-height: 100%;
+    width: 100%;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .chart-error {
+    width: min(760px, calc(100vw - 28px));
+    margin: 18px auto 0;
+    padding: 12px 16px;
+    border-radius: 14px;
+    border: 1px solid rgba(255,255,255,0.08);
+    background: rgba(167, 70, 93, 0.16);
+    color: #ffdce4;
+    backdrop-filter: blur(6px);
+  }
+
+  .book-shell {
+    width: min(760px, calc(100vw - 28px));
+    height: calc(100vh - 80px);
+    margin: 18px auto 24px;
+    padding-top: 0;
+    display: flex;
+    flex-direction: column;
+    perspective: 1600px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .book {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    width: 100%;
+  }
+
+  .book::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 34px;
+    z-index: 3;
+    border-radius: 8px;
+    border: 1.5px solid rgba(255,255,255,0.24);
+    background:
+      radial-gradient(circle at 10% 10%, #ffffff 1px, transparent 2px),
+      radial-gradient(circle at 25% 25%, #aeefff 1.5px, transparent 3px),
+      radial-gradient(circle at 40% 15%, #ffd6ff 2px, transparent 4px),
+      radial-gradient(circle at 60% 30%, #ffffff 1px, transparent 2px),
+      radial-gradient(circle at 80% 20%, #c8b6ff 1.5px, transparent 3px),
+      radial-gradient(circle at 15% 60%, #ffffff 2px, transparent 4px),
+      radial-gradient(circle at 35% 75%, #aeefff 1px, transparent 2px),
+      radial-gradient(circle at 55% 85%, #ffd6ff 1.5px, transparent 3px),
+      radial-gradient(circle at 75% 70%, #ffffff 2px, transparent 4px),
+      radial-gradient(circle at 90% 50%, #c8b6ff 1px, transparent 2px),
+      linear-gradient(to bottom, rgba(120,150,255,0.42), rgba(180,120,255,0.62));
+    box-shadow:
+      0 0 16px rgba(140, 160, 255, 0.68),
+      0 0 28px rgba(216, 196, 255, 0.22),
+      inset 0 0 8px rgba(255,255,255,0.28);
+    animation: spineSparkle 3s ease-in-out infinite alternate;
+  }
+
+  .book::after {
+    content: "";
+    position: absolute;
+    left: 27px;
+    top: 0;
+    bottom: 0;
+    width: 10px;
+    background: linear-gradient(to right, rgba(0,0,0,0.3), rgba(255,255,255,0.18), rgba(255,255,255,0.04));
+    box-shadow: 1px 0 0 rgba(255,255,255,0.14), -1px 0 0 rgba(0,0,0,0.22);
+    z-index: 3;
+  }
+
+  @keyframes spineSparkle {
+    0% {
+      opacity: 0.65;
+      filter: brightness(0.92);
+    }
+    100% {
+      opacity: 1;
+      filter: brightness(1.28);
+    }
+  }
+
+  .page {
+    position: absolute;
+    inset: 0;
+    padding: 36px 44px 88px 48px;
+    margin-left: 0;
+    border-radius: 22px;
+    background:
+      radial-gradient(circle at top left, rgba(143, 168, 255, 0.08), transparent 28%),
+      linear-gradient(135deg, rgba(31, 34, 56, 0.18), rgba(42, 47, 77, 0.12));
+    color: #f5f7ff;
+    box-shadow:
+      0 14px 34px rgba(0,0,0,0.18),
+      0 0 0 1px rgba(255,255,255,0.08),
+      0 0 24px rgba(216,196,255,0.12),
+      inset 0 1px 0 rgba(255,255,255,0.08),
+      inset 0 0 30px rgba(255,255,255,0.025);
+    border: 2px solid rgba(255,255,255,0.28);
+    backdrop-filter: blur(2px);
+    transform-origin: left center;
+    backface-visibility: hidden;
+    transition: transform 0.8s ease, opacity 0.45s ease;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .page.hidden {
+    opacity: 0;
+    pointer-events: none;
+    transform: rotateY(-100deg);
+  }
+
+  .page.active {
+    opacity: 1;
+    transform: rotateY(0deg);
+    z-index: 2;
+  }
+
+  .diary-entry-page {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+    border-radius: 18px;
+    background:
+      radial-gradient(circle at 18% 18%, rgba(196, 136, 255, 0.16), transparent 26%),
+      radial-gradient(circle at 82% 18%, rgba(126, 214, 255, 0.12), transparent 24%),
+      linear-gradient(180deg, rgba(7, 11, 23, 0.42), rgba(13, 20, 41, 0.92));
+  }
+
+  .book-diary-content {
+    height: 100%;
+    min-height: 0;
+    margin: -12px -14px -70px -22px;
+    color: #fff;
+  }
+
+  .book-diary-content .reading-title,
+  .book-diary-content .reading-subtitle {
+    display: none;
+  }
+
+  .book-diary-content .diary-page {
+    border-radius: 20px;
+    box-shadow:
+      0 12px 34px rgba(0,0,0,0.26),
+      inset 0 1px 0 rgba(255,255,255,0.06);
+  }
+
+  .tarot-index-page {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-content: center;
+    max-width: 720px;
+    margin: 0 auto;
+    gap: 18px;
+    padding: 34px 8px 12px;
+  }
+
+  .book-tarot-reading-content,
+  .book-tarot-result-content {
+    flex: 1;
+    min-height: 0;
+    margin: -10px -14px -44px -22px;
+    overflow-y: auto;
+    padding: 8px 12px 78px 32px;
+    scrollbar-width: none;
+  }
+
+  .book-tarot-reading-content {
+    padding-top: 0;
+  }
+
+  .book-tarot-reading-content::-webkit-scrollbar,
+  .book-tarot-result-content::-webkit-scrollbar,
+  .book-tarot-message-scroll::-webkit-scrollbar {
+    display: none;
+  }
+
+  .book-tarot-reading-content .tarot-reading-embedded {
+    align-items: start;
+  }
+
+  .book-tarot-message-scroll {
+    max-height: 100%;
+    overflow-y: auto;
+    padding-left: 18px;
+    padding-right: 8px;
+    scrollbar-width: none;
+  }
+
+  .book-tarot-message-scroll > div {
+    border-color: transparent;
+    background: transparent;
+    padding: 0;
+  }
+
+  .book-tarot-message-scroll > div > p:first-child {
+    display: none;
+  }
+
+  .book-tarot-message-scroll > div > div {
+    font-size: 16px;
+    line-height: 1.9;
+    color: rgba(245,247,255,0.93);
+    text-align: justify;
+  }
+
+  .book-tarot-consult-content {
+    display: flex;
+    padding-bottom: 90px;
+  }
+
+  .tarot-consult-panel {
+    min-height: 100%;
+    width: 100%;
+    display: grid;
+    grid-template-rows: auto auto minmax(0, 1fr) auto auto;
+    gap: 12px;
+    color: #f5f7ff;
+  }
+
+  .tarot-consult-summary {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 14px;
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 16px;
+    background: rgba(255,255,255,0.07);
+    padding: 14px;
+  }
+
+  .tarot-consult-summary h3 {
+    margin: 4px 0 0;
+    color: #fff;
+    font-size: 18px;
+    line-height: 1.4;
+  }
+
+  .tarot-consult-summary button,
+  .tarot-consult-empty button {
+    flex: 0 0 auto;
+    border: 1px solid rgba(255,255,255,0.16);
+    border-radius: 999px;
+    background: rgba(255,255,255,0.08);
+    color: #fff;
+    padding: 8px 12px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .tarot-consult-kicker {
+    margin: 0;
+    color: #f4c2c2;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+  }
+
+  .tarot-consult-messages {
+    min-height: 0;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 0 4px 8px 0;
+    scrollbar-width: none;
+  }
+
+  .tarot-consult-messages::-webkit-scrollbar {
+    display: none;
+  }
+
+  .tarot-consult-message {
+    max-width: 88%;
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 16px;
+    padding: 12px 14px;
+    white-space: pre-line;
+    font-size: 14px;
+    line-height: 1.75;
+  }
+
+  .tarot-consult-message-assistant {
+    align-self: flex-start;
+    background: rgba(255,255,255,0.08);
+    color: rgba(245,247,255,0.92);
+  }
+
+  .tarot-consult-message-user {
+    align-self: flex-end;
+    background: rgba(244,194,194,0.16);
+    color: #fff;
+  }
+
+  .tarot-consult-error {
+    margin: 0;
+    border: 1px solid rgba(255,126,126,0.36);
+    border-radius: 12px;
+    background: rgba(255,126,126,0.12);
+    color: #ffd6d6;
+    padding: 10px 12px;
+    font-size: 13px;
+  }
+
+  .tarot-consult-form {
+    display: grid;
+    grid-template-columns: minmax(0, 4fr) minmax(88px, 1fr);
+    gap: 10px;
+    align-items: stretch;
+    margin-bottom: 34px;
+  }
+
+  .tarot-consult-form textarea {
+    width: 100%;
+    min-height: 74px;
+    resize: vertical;
+    border: 1px solid rgba(255,255,255,0.14);
+    border-radius: 14px;
+    background: rgba(255,255,255,0.08);
+    color: #fff;
+    padding: 12px 14px;
+    outline: none;
+  }
+
+  .tarot-consult-form button {
+    position: relative;
+    overflow: hidden;
+    min-height: 46px;
+    width: 100%;
+    border: 1px solid rgba(244,194,194,0.52);
+    border-radius: 12px;
+    background:
+      radial-gradient(circle at 24% 22%, rgba(255,255,255,0.28), transparent 24%),
+      linear-gradient(135deg, rgba(244,194,194,0.26), rgba(216,196,255,0.14));
+    color: #ffe4ec;
+    padding: 0 18px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    cursor: pointer;
+    box-shadow:
+      0 10px 24px rgba(244,194,194,0.14),
+      inset 0 1px 0 rgba(255,255,255,0.16);
+    transition:
+      transform 0.18s ease,
+      border-color 0.18s ease,
+      background 0.18s ease,
+      box-shadow 0.18s ease,
+      filter 0.18s ease;
+  }
+
+  .tarot-consult-form button::after {
+    content: "";
+    position: absolute;
+    inset: 8px;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.12);
+    pointer-events: none;
+  }
+
+  .tarot-consult-form button:hover:not(:disabled) {
+    cursor: pointer;
+    transform: translateY(-1px);
+    border-color: rgba(255,232,246,0.72);
+    background:
+      radial-gradient(circle at 24% 22%, rgba(255,255,255,0.34), transparent 24%),
+      linear-gradient(135deg, rgba(244,194,194,0.34), rgba(216,196,255,0.22));
+    box-shadow:
+      0 14px 30px rgba(244,194,194,0.22),
+      0 0 18px rgba(255,255,255,0.12),
+      inset 0 1px 0 rgba(255,255,255,0.2);
+  }
+
+  .tarot-consult-form button:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+
+  .tarot-consult-empty {
+    margin: auto;
+    max-width: 420px;
+    display: grid;
+    gap: 16px;
+    place-items: center;
+    text-align: center;
+    color: rgba(245,247,255,0.9);
+  }
+
+  .book-tarot-reading-content section,
+  .book-tarot-result-content section {
+    border-radius: 16px;
+    padding: 16px;
+  }
+
+  .book-tarot-reading-content section:first-child {
+    border-color: transparent;
+    background: transparent;
+    box-shadow: none;
+    padding: 0 12px 10px;
+  }
+
+  .book-tarot-reading-content .min-h-\\[420px\\],
+  .book-tarot-result-content .min-h-\\[420px\\] {
+    min-height: 320px;
+  }
+
+  .tarot-index-card {
+    min-height: 260px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    gap: 10px;
+    border: 1px solid rgba(255,255,255,0.16);
+    border-radius: 18px;
+    background:
+      radial-gradient(circle at 50% 24%, rgba(255, 232, 176, 0.18), transparent 28%),
+      linear-gradient(150deg, rgba(46, 38, 76, 0.82), rgba(244, 194, 194, 0.18));
+    color: #fff;
+    text-align: left;
+    padding: 20px;
+    cursor: pointer;
+    box-shadow:
+      0 16px 36px rgba(0,0,0,0.2),
+      inset 0 1px 0 rgba(255,255,255,0.08);
+    transition:
+      transform 0.2s ease,
+      border-color 0.2s ease,
+      background 0.2s ease,
+      box-shadow 0.2s ease;
+  }
+
+  .tarot-index-art {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1.12;
+    margin-bottom: auto;
+    overflow: hidden;
+    border-radius: 14px;
+    border: 1px solid rgba(255,255,255,0.16);
+    background:
+      radial-gradient(circle at 34% 24%, rgba(255, 248, 211, 0.3), transparent 24%),
+      radial-gradient(circle at 72% 76%, rgba(126, 214, 255, 0.18), transparent 28%),
+      linear-gradient(150deg, rgba(255,255,255,0.08), rgba(255,255,255,0.03));
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.1),
+      0 12px 26px rgba(0,0,0,0.16);
+  }
+
+  .tarot-index-art::before {
+    content: "";
+    position: absolute;
+    left: 12%;
+    right: 12%;
+    bottom: 10%;
+    height: 14%;
+    border-radius: 999px;
+    background: radial-gradient(ellipse, rgba(244, 194, 194, 0.22), transparent 72%);
+    filter: blur(2px);
+  }
+
+  .tarot-index-art::after {
+    content: "";
+    position: absolute;
+    inset: 10px;
+    border-radius: 12px;
+    border: 1px dashed rgba(255,255,255,0.16);
+    pointer-events: none;
+  }
+
+  .tarot-index-art span {
+    position: absolute;
+    display: block;
+  }
+
+  .tarot-art-card,
+  .tarot-art-stack {
+    width: 32%;
+    height: 56%;
+    border-radius: 10px;
+    border: 1px solid rgba(255,255,255,0.48);
+    box-shadow:
+      0 12px 18px rgba(0,0,0,0.18),
+      inset 0 0 14px rgba(255,255,255,0.12);
+  }
+
+  .tarot-art-card-one {
+    left: 25%;
+    top: 27%;
+    background: linear-gradient(150deg, rgba(164, 138, 255, 0.68), rgba(255, 218, 180, 0.28));
+    transform: rotate(-13deg);
+  }
+
+  .tarot-art-card-two {
+    right: 25%;
+    top: 19%;
+    background:
+      radial-gradient(circle at 50% 34%, rgba(255, 239, 183, 0.6), transparent 22%),
+      linear-gradient(150deg, rgba(47, 39, 78, 0.94), rgba(244, 194, 194, 0.36));
+    transform: rotate(10deg);
+  }
+
+  .tarot-art-card-one::before,
+  .tarot-art-card-two::before,
+  .tarot-art-stack-one::before,
+  .tarot-art-stack-two::before,
+  .tarot-art-stack-three::before {
+    content: "";
+    position: absolute;
+    inset: 8px;
+    border-radius: 7px;
+    border: 1px solid rgba(255,255,255,0.24);
+  }
+
+  .tarot-art-moon {
+    right: 34%;
+    top: 30%;
+    width: 24px;
+    height: 24px;
+    border-radius: 999px;
+    background: #ffedb5;
+    box-shadow: 0 0 18px rgba(255, 232, 168, 0.58);
+  }
+
+  .tarot-art-moon::after {
+    content: "";
+    position: absolute;
+    left: 8px;
+    top: -2px;
+    width: 24px;
+    height: 24px;
+    border-radius: 999px;
+    background: rgba(52, 42, 80, 0.95);
+  }
+
+  .tarot-art-face {
+    left: 52%;
+    top: 42%;
+    width: 38px;
+    height: 22px;
+    transform: translateX(-50%);
+    z-index: 3;
+  }
+
+  .tarot-art-face::before,
+  .tarot-art-face::after {
+    content: "";
+    position: absolute;
+    top: 2px;
+    width: 5px;
+    height: 5px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.82);
+    box-shadow: 0 0 8px rgba(255,255,255,0.45);
+  }
+
+  .tarot-art-face::before {
+    left: 8px;
+  }
+
+  .tarot-art-face::after {
+    right: 8px;
+  }
+
+  .tarot-art-face {
+    border-bottom: 2px solid rgba(255,255,255,0.66);
+    border-radius: 0 0 999px 999px;
+  }
+
+  .tarot-art-spark {
+    width: 9px;
+    height: 9px;
+    background: #fff;
+    clip-path: polygon(50% 0, 61% 36%, 100% 50%, 61% 64%, 50% 100%, 39% 64%, 0 50%, 39% 36%);
+    box-shadow: 0 0 12px rgba(255,255,255,0.7);
+  }
+
+  .tarot-art-spark-one {
+    left: 22%;
+    top: 19%;
+  }
+
+  .tarot-art-spark-two {
+    right: 20%;
+    bottom: 22%;
+    width: 7px;
+    height: 7px;
+    opacity: 0.78;
+  }
+
+  .tarot-art-spark-three {
+    left: 17%;
+    bottom: 22%;
+    width: 8px;
+    height: 8px;
+  }
+
+  .tarot-art-spark-four {
+    right: 18%;
+    top: 20%;
+    width: 8px;
+    height: 8px;
+  }
+
+  .tarot-art-bow {
+    width: 34px;
+    height: 18px;
+    z-index: 4;
+  }
+
+  .tarot-art-bow::before,
+  .tarot-art-bow::after {
+    content: "";
+    position: absolute;
+    top: 3px;
+    width: 15px;
+    height: 12px;
+    border-radius: 10px 10px 3px 10px;
+    background: linear-gradient(135deg, #ffd6e8, #f4c2c2);
+    box-shadow: 0 0 10px rgba(244, 194, 194, 0.32);
+  }
+
+  .tarot-art-bow::before {
+    left: 1px;
+    transform: rotate(-28deg);
+  }
+
+  .tarot-art-bow::after {
+    right: 1px;
+    transform: rotate(28deg) scaleX(-1);
+  }
+
+  .tarot-art-bow-reading {
+    left: 50%;
+    top: 14%;
+    transform: translateX(-50%);
+  }
+
+  .tarot-art-bow-decks {
+    left: 50%;
+    bottom: 17%;
+    transform: translateX(-50%);
+  }
+
+  .tarot-art-stack-one {
+    left: 24%;
+    top: 28%;
+    background: linear-gradient(150deg, rgba(255, 210, 230, 0.46), rgba(117, 138, 255, 0.28));
+    transform: rotate(-14deg);
+  }
+
+  .tarot-art-stack-two {
+    left: 34%;
+    top: 22%;
+    background: linear-gradient(150deg, rgba(255, 239, 183, 0.42), rgba(216, 196, 255, 0.34));
+    transform: rotate(-2deg);
+  }
+
+  .tarot-art-stack-three {
+    right: 25%;
+    top: 28%;
+    background: linear-gradient(150deg, rgba(126, 214, 255, 0.36), rgba(244, 194, 194, 0.34));
+    transform: rotate(12deg);
+  }
+
+  .tarot-art-gem {
+    left: 50%;
+    top: 45%;
+    width: 24px;
+    height: 24px;
+    background: linear-gradient(135deg, #fff3b8, #f4c2c2);
+    transform: translate(-50%, -50%) rotate(45deg);
+    border-radius: 6px 2px 6px 2px;
+    box-shadow: 0 0 18px rgba(255, 231, 166, 0.5);
+  }
+
+  .tarot-art-gem::before {
+    content: "";
+    position: absolute;
+    inset: 6px;
+    border-radius: 3px 1px 3px 1px;
+    background: rgba(255,255,255,0.34);
+  }
+
+  .tarot-art-scroll {
+    left: 22%;
+    top: 20%;
+    width: 56%;
+    height: 62%;
+    border-radius: 16px;
+    border: 1px solid rgba(255,255,255,0.38);
+    background:
+      linear-gradient(90deg, rgba(255,255,255,0.2) 0 14%, transparent 14%),
+      linear-gradient(150deg, rgba(255, 248, 211, 0.34), rgba(244, 194, 194, 0.16));
+    box-shadow:
+      0 14px 24px rgba(0,0,0,0.18),
+      inset 0 1px 0 rgba(255,255,255,0.14);
+  }
+
+  .tarot-art-seal {
+    right: 25%;
+    bottom: 22%;
+    width: 26px;
+    height: 26px;
+    border-radius: 999px;
+    background: radial-gradient(circle, #fff3b8 0 34%, #f4c2c2 36% 64%, rgba(244,194,194,0.2) 66%);
+    box-shadow: 0 0 16px rgba(244, 194, 194, 0.42);
+  }
+
+  .tarot-art-heart {
+    left: 27%;
+    bottom: 24%;
+    width: 17px;
+    height: 17px;
+    border-radius: 9px 9px 2px 9px;
+    background: #ffd1df;
+    transform: rotate(45deg);
+    box-shadow: 0 0 14px rgba(255, 193, 214, 0.48);
+  }
+
+  .tarot-art-heart::before,
+  .tarot-art-heart::after {
+    content: "";
+    position: absolute;
+    width: 17px;
+    height: 17px;
+    border-radius: 999px;
+    background: inherit;
+  }
+
+  .tarot-art-heart::before {
+    left: -8px;
+    top: 0;
+  }
+
+  .tarot-art-heart::after {
+    left: 0;
+    top: -8px;
+  }
+
+  .tarot-art-line {
+    left: 38%;
+    height: 2px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.46);
+  }
+
+  .tarot-art-line-one {
+    top: 43%;
+    width: 28%;
+  }
+
+  .tarot-art-line-two {
+    top: 54%;
+    width: 20%;
+  }
+
+  .tarot-index-card:hover {
+    transform: translateY(-1px);
+    border-color: rgba(255,255,255,0.3);
+    background-color: rgba(255,255,255,0.12);
+    box-shadow:
+      0 18px 42px rgba(0,0,0,0.24),
+      0 0 0 1px rgba(255,255,255,0.1) inset;
+  }
+
+  .tarot-index-card-subtle {
+    opacity: 0.82;
+  }
+
+  .tarot-index-kicker {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: rgba(244, 194, 194, 0.92);
+  }
+
+  .tarot-index-card strong {
+    font-size: 24px;
+    line-height: 1.2;
+  }
+
+  .tarot-index-card span:last-child {
+    font-size: 14px;
+    line-height: 1.7;
+    color: rgba(226, 231, 255, 0.78);
+  }
+
+  .diary-entry-page::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(90deg, transparent, rgba(255,255,255,0.06), transparent),
+      radial-gradient(circle at 50% 72%, rgba(255,255,255,0.12), transparent 34%);
+    opacity: 0.58;
+  }
+
+  .diary-entry-cover {
+    position: relative;
+    width: min(260px, 64vw);
+    aspect-ratio: 3 / 4;
+    border-radius: 18px 12px 12px 18px;
+    border: 1px solid rgba(255,255,255,0.14);
+    background:
+      linear-gradient(90deg, rgba(255,255,255,0.18) 0 12px, transparent 12px),
+      radial-gradient(circle at 32% 24%, rgba(244, 194, 194, 0.2), transparent 22%),
+      linear-gradient(135deg, #171d34, #252b4a 56%, #121827);
+    box-shadow:
+      0 26px 46px rgba(0,0,0,0.32),
+      0 0 40px rgba(126, 214, 255, 0.1),
+      inset 0 1px 0 rgba(255,255,255,0.08);
+    transform: translateY(4px);
+  }
+
+  .diary-entry-moon {
+    position: absolute;
+    left: 50%;
+    top: 22%;
+    width: 58px;
+    height: 58px;
+    border-radius: 999px;
+    transform: translateX(-50%);
+    background: radial-gradient(circle, #fff8d9 0 32%, #f4c2c2 34% 48%, transparent 50%);
+    box-shadow: 0 0 24px rgba(244, 194, 194, 0.26);
+  }
+
+  .diary-entry-line {
+    position: absolute;
+    left: 24%;
+    right: 18%;
+    height: 2px;
+    border-radius: 999px;
+    background: rgba(220, 228, 255, 0.42);
+  }
+
+  .diary-entry-line-one {
+    top: 54%;
+  }
+
+  .diary-entry-line-two {
+    top: 62%;
+    right: 30%;
+  }
+
+  .diary-entry-ribbon {
+    position: absolute;
+    right: 24px;
+    top: 0;
+    width: 24px;
+    height: 42%;
+    background: linear-gradient(180deg, #f4c2c2, #d8c4ff);
+    clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 82%, 0 100%);
+    box-shadow: 0 0 16px rgba(244, 194, 194, 0.22);
+  }
+
+  .page::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 42px;
+    background: linear-gradient(to bottom, transparent, rgba(28, 31, 52, 0.9));
+    pointer-events: none;
+  }
+
+  .reading-title {
+    margin: 0 0 12px;
+    padding-left: 12px;
+    border-left: 4px solid #8fa8ff;
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: #f7f8ff;
+    text-shadow: 0 0 10px rgba(180, 190, 255, 0.24);
+    flex-shrink: 0;
+  }
+
+  .reading-subtitle {
+    margin: 0 0 18px;
+    padding-left: 12px;
+    font-size: 13px;
+    letter-spacing: 0.16em;
+    color: rgba(220, 228, 255, 0.72);
+    text-transform: uppercase;
+    flex-shrink: 0;
+  }
+
+  .index-book-page {
+    height: 100%;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    padding: 8px 10px 0;
+    border-radius: 18px;
+    background: transparent;
+    backdrop-filter: none;
+  }
+
+  .index-note {
+    margin: 0 0 14px;
+    font-size: 12px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: rgba(220, 228, 255, 0.72);
+  }
+
+  .index-body,
+  .reading-body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .index-body::-webkit-scrollbar,
+  .reading-body::-webkit-scrollbar {
+    display: none;
+  }
+
+  .reading-muted {
+    margin: 0;
+    color: rgba(220, 228, 255, 0.72);
+  }
+
+  .index-group {
+    margin-bottom: 28px;
+  }
+
+  .index-letter {
+    margin: 0 0 12px;
+    padding-bottom: 6px;
+    font-size: 22px;
+    font-weight: 600;
+    color: #d9deff;
+    border-bottom: 1px solid rgba(180, 190, 255, 0.22);
+    text-shadow: 0 0 8px rgba(170, 180, 255, 0.18);
+  }
+
+  .index-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 10px 18px;
+  }
+
+  .index-name-btn {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 14px;
+    border: 1px solid rgba(180, 190, 255, 0.16);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.04);
+    color: #f5f7ff;
+    cursor: pointer;
+    transition:
+      transform 0.2s ease,
+      background 0.2s ease,
+      border-color 0.2s ease,
+      box-shadow 0.2s ease,
+      filter 0.2s ease;
+    text-align: left;
+    backdrop-filter: blur(3px);
+  }
+
+  .index-name-btn:hover {
+    transform: translateY(-1px);
+    background: rgba(255,255,255,0.1);
+    border-color: rgba(220, 228, 255, 0.42);
+    filter: brightness(1.08);
+    box-shadow:
+      0 8px 20px rgba(60, 80, 170, 0.18),
+      0 0 0 1px rgba(255,255,255,0.12) inset,
+      0 0 18px rgba(255,255,255,0.1);
+  }
+
+  .index-name-btn-static {
+    cursor: default;
+  }
+
+  .index-name-btn-static:hover {
+    transform: none;
+    background: rgba(255,255,255,0.04);
+    border-color: rgba(180, 190, 255, 0.16);
+    box-shadow: none;
+  }
+
+  .index-name-btn:disabled {
+    opacity: 0.65;
+    cursor: default;
+    transform: none;
+    box-shadow: none;
+  }
+
+  .index-name {
+    font-size: 15px;
+    font-weight: 500;
+    color: #ffffff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .index-meta {
+    flex-shrink: 0;
+    font-size: 12px;
+    color: rgba(215, 222, 255, 0.65);
+  }
+
+  .guest-card {
+    border-radius: 22px;
+    background:ze: 12px;
+    color: rgba(215, 222, 255, 0.65);
+    border: none;
+    padding: 8px 10px 0;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .guest-eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 14px;
+    color: rgba(220, 228, 255, 0.82);
+    letter-spacing: 0.18em;
+    font-size: 12px;
+    text-transform: uppercase;
+  }
+
+  .guest-title {
+    margin: 0;
+    font-size: clamp(28px, 4vw, 46px);
+    line-height: 1.15;
+    color: #f7f8ff;
+  }
+
+  .guest-subtitle {
+    margin: 8px 0 0;
+    font-size: clamp(20px, 2.8vw, 20px);
+    line-height: 1.15;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: #fff6fb;
+    text-shadow: 0 0 10px rgba(189, 171, 255, 0.16);
+  }
+
+  .guest-text {
+    margin: 18px 0 0;
+    max-width: 56rem;
+    line-height: 2;
+    color: rgba(245,247,255,0.9);
+    font-size: 15px;
+  }
+
+  .guest-actions {
+    margin-top: 28px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .guest-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 12px 20px;
+    border-radius: 999px;
+    border: 1px solid rgba(255,255,255,0.08);
+    background: linear-gradient(135deg, #7f8cff, #97a8ff);
+    color: white;
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+  }
+
+  .chooser-page {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 28px;
+    padding: 10px 4px 0;
+  }
+
+  .chooser-header {
+    max-width: 56rem;
+  }
+
+  .chooser-kicker {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 12px;
+    font-size: 12px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: rgba(220, 228, 255, 0.78);
+  }
+
+  .chooser-title {
+    margin: 0;
+    font-size: clamp(28px, 4vw, 44px);
+    line-height: 1.1;
+    color: #f7f8ff;
+  }
+
+  .chooser-text {
+    margin: 12px 0 0;
+    max-width: 44rem;
+    font-size: 15px;
+    line-height: 1.9;
+    color: rgba(220, 228, 255, 0.78);
+  }
+
+  .chooser-grid {
+    display: grid;
+    gap: 18px;
+    grid-template-columns: minmax(0, 1fr);
+    padding-left: 22px;
+  }
+
+  .chooser-card {
+    display: grid;
+    grid-template-columns: minmax(120px, 168px) minmax(0, 1fr);
+    align-items: center;
+    gap: 18px;
+    width: 100%;
+    text-align: left;
+    border-radius: 26px;
+    border: 1px solid rgba(255,255,255,0.18);
+    background: rgba(255,255,255,0.08);
+    padding: 18px;
+    color: #fff;
+    box-shadow: 0 16px 40px rgba(0,0,0,0.18);
+    cursor: pointer;
+    transition:
+      transform 0.2s ease,
+      background 0.2s ease,
+      border-color 0.2s ease,
+      box-shadow 0.2s ease,
+      filter 0.2s ease;
+  }
+
+  .chooser-card:hover {
+    transform: translateY(-2px);
+    border-color: rgba(255,255,255,0.2);
+    background: rgba(255,255,255,0.1);
+    filter: brightness(1.03);
+    box-shadow:
+      0 10px 22px rgba(127, 140, 255, 0.12),
+      0 18px 44px rgba(0,0,0,0.2),
+      0 0 0 1px rgba(255,255,255,0.08) inset,
+      0 0 26px rgba(255,255,255,0.08);
+  }
+
+  .chooser-media {
+    min-width: 0;
+  }
+
+  .chooser-media-frame {
+    position: relative;
+    aspect-ratio: 4 / 3;
+    width: 100%;
+    overflow: hidden;
+    border-radius: 20px;
+    border: 1px solid rgba(255,255,255,0.03);
+    background: transparent;
+    backdrop-filter: blur(14px);
+    box-shadow:
+      inset 0 0 0 1px rgba(255,255,255,0.04),
+      0 0 18px rgba(255,255,255,0.03);
+  }
+
+  .chooser-media-frame::before {
+    content: "";
+    position: absolute;
+    inset: 8px;
+    border-radius: 14px;
+    border: 1px solid rgba(255,255,255,0.05);
+    background: none;
+    box-shadow: 0 0 18px rgba(255,255,255,0.04);
+    filter: blur(1.5px);
+    opacity: 0.75;
+  }
+
+  .chooser-media-glow {
+    position: absolute;
+    inset: -16px;
+    border-radius: 28px;
+    background: radial-gradient(circle at center, rgba(255,255,255,0.035), transparent 68%);
+    filter: blur(22px);
+    opacity: 0.28;
+  }
+
+  .chooser-media-chart::before {
+    background:
+      linear-gradient(180deg, rgba(127,140,255,0.16), rgba(255,255,255,0.04)),
+      radial-gradient(circle at 35% 25%, rgba(175, 202, 255, 0.18), transparent 36%),
+      radial-gradient(circle at 70% 78%, rgba(196, 91, 214, 0.12), transparent 38%);
+  }
+
+  .chooser-media-diary::before {
+    background:
+      linear-gradient(180deg, rgba(255, 210, 230, 0.16), rgba(255,255,255,0.04)),
+      radial-gradient(circle at 30% 28%, rgba(255, 255, 255, 0.18), transparent 36%),
+      radial-gradient(circle at 72% 76%, rgba(116, 140, 255, 0.12), transparent 38%);
+  }
+
+  .chooser-media-tarot::before {
+    background:
+      linear-gradient(180deg, rgba(244, 194, 194, 0.18), rgba(255,255,255,0.04)),
+      radial-gradient(circle at 38% 26%, rgba(255, 232, 176, 0.18), transparent 36%),
+      radial-gradient(circle at 70% 78%, rgba(174, 120, 255, 0.14), transparent 38%);
+  }
+
+  .chooser-illustration {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+  }
+
+  .chooser-illustration span {
+    position: absolute;
+    display: block;
+  }
+
+  .chart-orbit {
+    left: 50%;
+    top: 50%;
+    border-radius: 999px;
+    border: 1px solid rgba(244, 247, 255, 0.56);
+    transform: translate(-50%, -50%);
+    box-shadow: 0 0 16px rgba(169, 190, 255, 0.18);
+  }
+
+  .chart-orbit-outer {
+    width: 68%;
+    aspect-ratio: 1;
+  }
+
+  .chart-orbit-inner {
+    width: 38%;
+    aspect-ratio: 1;
+    border-color: rgba(244, 194, 194, 0.54);
+  }
+
+  .chart-illustration::before,
+  .chart-illustration::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 62%;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.54), transparent);
+    transform: translate(-50%, -50%) rotate(28deg);
+  }
+
+  .chart-illustration::after {
+    transform: translate(-50%, -50%) rotate(118deg);
+  }
+
+  .chart-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 999px;
+    background: #fff6d6;
+    box-shadow: 0 0 14px rgba(255, 239, 175, 0.62);
+  }
+
+  .chart-dot-one {
+    left: 28%;
+    top: 27%;
+  }
+
+  .chart-dot-two {
+    right: 24%;
+    top: 39%;
+    width: 8px;
+    height: 8px;
+    background: #dce7ff;
+  }
+
+  .chart-dot-three {
+    left: 46%;
+    bottom: 22%;
+    width: 7px;
+    height: 7px;
+    background: #ffd6e8;
+  }
+
+  .diary-book {
+    left: 24%;
+    top: 19%;
+    width: 50%;
+    height: 64%;
+    border-radius: 12px 16px 16px 12px;
+    border: 1px solid rgba(255,255,255,0.62);
+    background:
+      linear-gradient(90deg, rgba(255,255,255,0.16) 0 14%, transparent 14%),
+      linear-gradient(145deg, rgba(255, 202, 224, 0.64), rgba(156, 179, 255, 0.26));
+    box-shadow:
+      0 16px 28px rgba(0,0,0,0.16),
+      inset 0 0 18px rgba(255,255,255,0.18);
+  }
+
+  .diary-ribbon {
+    left: 33%;
+    top: 18%;
+    width: 8px;
+    height: 58%;
+    border-radius: 999px;
+    background: linear-gradient(180deg, #fff0a8, #f4a9c6);
+    box-shadow: 0 0 14px rgba(255, 226, 150, 0.4);
+  }
+
+  .diary-line {
+    left: 44%;
+    width: 22%;
+    height: 2px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.58);
+  }
+
+  .diary-line-one {
+    top: 42%;
+  }
+
+  .diary-line-two {
+    top: 53%;
+    width: 16%;
+  }
+
+  .diary-heart {
+    right: 21%;
+    bottom: 23%;
+    width: 14px;
+    height: 14px;
+    border-radius: 8px 8px 2px 8px;
+    background: #ffd1df;
+    transform: rotate(45deg);
+    box-shadow: 0 0 14px rgba(255, 193, 214, 0.5);
+  }
+
+  .diary-heart::before,
+  .diary-heart::after {
+    content: "";
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    border-radius: 999px;
+    background: inherit;
+  }
+
+  .diary-heart::before {
+    left: -7px;
+    top: 0;
+  }
+
+  .diary-heart::after {
+    left: 0;
+    top: -7px;
+  }
+
+  .tarot-card {
+    width: 38%;
+    height: 66%;
+    border-radius: 13px;
+    border: 1px solid rgba(255,255,255,0.62);
+    box-shadow:
+      0 18px 30px rgba(0,0,0,0.18),
+      inset 0 0 18px rgba(255,255,255,0.14);
+  }
+
+  .tarot-card-back {
+    left: 24%;
+    top: 20%;
+    background: linear-gradient(150deg, rgba(166, 137, 255, 0.46), rgba(255, 212, 156, 0.2));
+    transform: rotate(-10deg);
+  }
+
+  .tarot-card-front {
+    right: 24%;
+    top: 16%;
+    background:
+      radial-gradient(circle at 50% 36%, rgba(255, 239, 183, 0.44), transparent 22%),
+      linear-gradient(150deg, rgba(46, 38, 76, 0.86), rgba(244, 194, 194, 0.3));
+    transform: rotate(8deg);
+  }
+
+  .tarot-card-front::before {
+    content: "";
+    position: absolute;
+    inset: 10px;
+    border-radius: 9px;
+    border: 1px solid rgba(255,255,255,0.28);
+  }
+
+  .tarot-moon {
+    right: 33%;
+    top: 28%;
+    width: 22px;
+    height: 22px;
+    border-radius: 999px;
+    background: #ffe9a8;
+    box-shadow: 0 0 18px rgba(255, 232, 168, 0.52);
+  }
+
+  .tarot-moon::after {
+    content: "";
+    position: absolute;
+    left: 8px;
+    top: -2px;
+    width: 22px;
+    height: 22px;
+    border-radius: 999px;
+    background: rgba(55, 42, 82, 0.92);
+  }
+
+  .tarot-star {
+    width: 8px;
+    height: 8px;
+    background: #ffffff;
+    clip-path: polygon(50% 0, 61% 36%, 100% 50%, 61% 64%, 50% 100%, 39% 64%, 0 50%, 39% 36%);
+    box-shadow: 0 0 12px rgba(255,255,255,0.65);
+  }
+
+  .tarot-star-one {
+    right: 30%;
+    bottom: 25%;
+  }
+
+  .tarot-star-two {
+    right: 44%;
+    bottom: 35%;
+    width: 6px;
+    height: 6px;
+    opacity: 0.78;
+  }
+
+  .chooser-copy {
+    min-width: 0;
+  }
+
+  .chooser-eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 0 12px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: rgba(240, 243, 255, 0.72);
+  }
+
+  .chooser-card h3 {
+    margin: 0;
+    font-size: 24px;
+    line-height: 1.2;
+    color: #ffffff;
+  }
+
+  .chooser-card p {
+    margin: 12px 0 0;
+    font-size: 14px;
+    line-height: 1.85;
+    color: rgba(226, 231, 255, 0.78);
+  }
+
+  @media (max-width: 840px) {
+    .chooser-grid {
+      grid-template-columns: 1fr;
+      padding-left: 0;
+      gap: 12px;
+    }
+
+    .chooser-card {
+      grid-template-columns: 1fr;
+      gap: 16px;
+      padding: 18px;
+    }
+
+    .tarot-index-page {
+      grid-template-columns: 1fr;
+      align-content: start;
+      overflow-y: auto;
+      padding: 42px 8px 12px;
+    }
+
+    .tarot-index-card {
+      min-height: 150px;
+    }
+
+  }
+
+  .form-card {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding-top: 10px;
+  }
+
+  .form-row {
+    display: grid;
+    grid-template-columns: 130px 1fr;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .form-row label {
+    font-size: 16px;
+    font-weight: 600;
+    color: #ffffff;
+  }
+
+  .form-row input {
+    width: 100%;
+    padding: 12px 14px;
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px;
+    background: rgba(255,255,255,0.14);
+    color: #ffffff;
+    font-size: 15px;
+  }
+
+  .form-row input:focus {
+    outline: none;
+    border-color: #8fa8ff;
+    box-shadow: 0 0 0 3px rgba(143, 168, 255, 0.18);
+  }
+
+  .form-actions {
+    margin-top: auto;
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    padding-top: 20px;
+  }
+
+  .form-actions button,
+  .book-nav button {
+    border: none;
+    border-radius: 14px;
+    cursor: pointer;
+    color: white;
+    font-size: 16px;
+    font-weight: 600;
+    transition:
+      transform 0.2s ease,
+      box-shadow 0.2s ease,
+      opacity 0.2s ease,
+      background 0.2s ease,
+      border-color 0.2s ease,
+      filter 0.2s ease;
+  }
+
+  .form-actions button:hover,
+  .book-nav button:hover {
+    transform: translateY(-1px);
+    filter: brightness(1.08);
+  }
+
+  .primary-btn {
+    padding: 12px 20px;
+    background: linear-gradient(135deg, #7f8cff, #97a8ff);
+    box-shadow: 0 6px 18px rgba(127, 140, 255, 0.28);
+  }
+
+  .primary-btn:hover {
+    background: linear-gradient(135deg, #99a5ff, #c2cbff);
+    box-shadow:
+      0 10px 22px rgba(127, 140, 255, 0.24),
+      0 0 0 1px rgba(255,255,255,0.18) inset,
+      0 0 18px rgba(255,255,255,0.12);
+  }
+
+  .secondary-btn {
+    padding: 12px 20px;
+    background: rgba(255,255,255,0.12);
+    color: #f5f7ff;
+    border: 1px solid rgba(255,255,255,0.08);
+  }
+
+  .secondary-btn:hover {
+    background: rgba(255,255,255,0.2);
+    border-color: rgba(255,255,255,0.22);
+    box-shadow:
+      0 10px 22px rgba(0,0,0,0.18),
+      0 0 0 1px rgba(255,255,255,0.12) inset,
+      0 0 18px rgba(255,255,255,0.12);
+  }
+
+  .reading-body {
+    white-space: pre-wrap;
+    line-height: 1.9;
+    font-size: 16px;
+    padding: 4px 6px 14px 18px;
+    color: rgba(245,247,255,0.93);
+    text-align: justify;
+  }
+
+  .chart-box {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-height: 100%;
+    padding: 4px 0 14px;
+  }
+
+  .chart-box img {
+    display: block;
+    max-width: 100%;
+    max-height: calc(100vh - 260px);
+    object-fit: contain;
+    border-radius: 18px;
+    box-shadow:
+      0 18px 44px rgba(0,0,0,0.28),
+      0 0 0 1px rgba(255,255,255,0.06);
+  }
+
+  .result-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 4px;
+  }
+
+  .result-table th,
+  .result-table td {
+    border-bottom: 1px solid rgba(255,255,255,0.16);
+    padding: 10px;
+    text-align: center;
+    word-break: break-word;
+  }
+
+  .result-table th {
+    background: rgba(255,255,255,0.08);
+    font-weight: 500;
+  }
+
+  .book-nav {
+    position: absolute;
+    left: 44px;
+    right: 10px;
+    bottom: 24px;
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    pointer-events: none;
+    z-index: 10;
+  }
+
+  .book-nav button {
+    pointer-events: auto;
+    width: 52px;
+    height: 46px;
+    padding: 0 18px;
+    border-radius: 999px;
+    border: 1px solid rgba(255,255,255,0.14);
+    background: rgba(255,255,255,0.08);
+    box-shadow: 0 10px 24px rgba(0,0,0,0.18);
+    color: #f5f7ff;
+    font-size: 22px;
+  }
+
+  .book-nav button:hover {
+    background: rgba(255,255,255,0.18);
+    border-color: rgba(255,255,255,0.34);
+    box-shadow:
+      0 14px 28px rgba(0,0,0,0.22),
+      0 0 0 1px rgba(255,255,255,0.18) inset,
+      0 0 18px rgba(255,255,255,0.14);
+  }
+
+  .book-nav button:disabled {
+    opacity: 0.25;
+    cursor: default;
+    transform: none;
+  }
+
+  .book-nav-hidden {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 180ms ease;
+  }
+
+  .book-nav-hidden button {
+    pointer-events: none;
+  }
+
+  .footer {
+    text-align: center;
+    padding: 0 16px 18px;
+    color: #c3c7ff;
+    opacity: 0.72;
+    font-size: 14px;
+  }
+
+  @media (max-width: 760px) {
+    .book-shell {
+      width: calc(100vw - 18px);
+      height: calc(100vh - 86px);
+      height: calc(100dvh - 86px);
+      margin: 10px auto 18px;
+    }
+
+    .page {
+      padding: 22px 16px 76px 26px;
+      margin-left: 0;
+    }
+
+    .chooser-page {
+      justify-content: center;
+      gap: 12px;
+      padding: 0;
+    }
+
+    .chooser-card {
+      grid-template-columns: minmax(76px, 92px) minmax(0, 1fr);
+      gap: 12px;
+      min-height: 122px;
+      padding: 12px;
+      border-radius: 18px;
+    }
+
+    .chooser-media-frame {
+      border-radius: 14px;
+    }
+
+    .chooser-card h3 {
+      font-size: 16px;
+      line-height: 1.22;
+    }
+
+    .chooser-card p {
+      display: none;
+    }
+
+    .chooser-eyebrow {
+      margin-bottom: 5px;
+      font-size: 10px;
+      letter-spacing: 0.16em;
+    }
+
+    .tarot-index-page {
+      gap: 12px;
+      padding: 8px 2px 4px;
+    }
+
+    .tarot-index-card {
+      min-height: 190px;
+      padding: 14px;
+    }
+
+    .tarot-index-art {
+      width: min(200px, 58vw);
+    }
+
+    .book-tarot-reading-content,
+    .book-tarot-result-content {
+      margin: -6px -10px -36px -18px;
+      padding: 4px 8px 70px 24px;
+    }
+
+    .book-tarot-reading-content section,
+    .book-tarot-result-content section {
+      padding: 12px;
+    }
+
+    .tarot-consult-panel {
+      gap: 10px;
+      min-height: 100%;
+    }
+
+    .tarot-consult-summary {
+      padding: 12px;
+    }
+
+    .tarot-consult-summary h3 {
+      font-size: 15px;
+    }
+
+    .tarot-consult-message {
+      max-width: 96%;
+      font-size: 13px;
+      line-height: 1.65;
+    }
+
+    .tarot-consult-form {
+      grid-template-columns: minmax(0, 4fr) minmax(74px, 1fr);
+      gap: 8px;
+    }
+
+    .tarot-consult-form textarea {
+      min-height: 68px;
+      resize: none;
+    }
+
+    .diary-entry-cover {
+      width: min(220px, 62vw);
+    }
+
+    .form-row {
+      grid-template-columns: 1fr;
+      gap: 8px;
+    }
+
+    .reading-title {
+      margin-bottom: 8px;
+      font-size: 18px;
+    }
+
+    .reading-subtitle {
+      margin-bottom: 12px;
+      font-size: 11px;
+      letter-spacing: 0.14em;
+    }
+
+    .index-list {
+      grid-template-columns: 1fr;
+    }
+
+    .book-nav {
+      left: 22px;
+      right: 8px;
+      bottom: 10px;
+    }
+
+    .book-nav button {
+      width: 46px;
+      height: 40px;
+      font-size: 19px;
+    }
+
+    .chart-box img {
+      max-height: calc(100vh - 310px);
+    }
+  }
+`;

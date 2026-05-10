@@ -32,3 +32,27 @@ class Profile(models.Model):
 
     def __str__(self):
         return self.user.username
+
+
+class DiaryMemoryChunk(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="diary_memory_chunks")
+    diary = models.ForeignKey(Diary, on_delete=models.CASCADE, related_name="memory_chunks")
+    chunk_index = models.PositiveIntegerField()
+    source_date = models.DateField()
+    source_title = models.CharField(max_length=200, blank=True)
+    text = models.TextField()
+    text_hash = models.CharField(max_length=64, db_index=True)
+    embedding = models.JSONField(default=list, blank=True)
+    embedding_model = models.CharField(max_length=80, default="text-embedding-3-small")
+    token_estimate = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-source_date", "chunk_index", "id"]
+        constraints = [
+            models.UniqueConstraint(fields=["diary", "chunk_index"], name="unique_diary_memory_chunk_index"),
+        ]
+
+    def __str__(self):
+        return f"{self.diary_id}:{self.chunk_index}"

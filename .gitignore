@@ -29,6 +29,7 @@ django_backend/de440s.bsp
 # Node.js
 node_modules/
 package-lock.json
+!react_frontend/package-lock.json
 
 # IDE
 .vscode/

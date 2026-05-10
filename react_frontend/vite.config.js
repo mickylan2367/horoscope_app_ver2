@@ -2,11 +2,11 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 
-export default defineConfig(({ command }) => ({
-  base: command === "build" ? "/static/react/" : "/",
+export default defineConfig({
+  base: "/",
   plugins: [react(), tailwindcss()],
   build: {
-    outDir: "../django_backend/static/react",
+    outDir: "dist",
     emptyOutDir: true,
   },
   server: {
@@ -30,4 +30,4 @@ export default defineConfig(({ command }) => ({
       },
     },
   },
-}));
+});

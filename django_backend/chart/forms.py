@@ -10,7 +10,7 @@ from .models import HoroscopeProfile
 
 class HoroscopeForm(forms.Form):
     profile = forms.ModelChoiceField(
-        queryset=HoroscopeProfile.objects.all().order_by('person_name'),
+        queryset=HoroscopeProfile.objects.none(),
         required=False,
         empty_label="登録済みホロスコープを選択"
     )
