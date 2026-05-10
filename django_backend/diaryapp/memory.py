@@ -12,7 +12,14 @@ EMBEDDING_MODEL = os.getenv("OPENAI_EMBEDDING_MODEL", "text-embedding-3-small")
 CHUNK_SIZE = 1200
 CHUNK_OVERLAP = 160
 
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+_client = None
+
+
+def get_openai_client():
+    global _client
+    if _client is None:
+        _client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    return _client
 
 
 def normalize_diary_text(text):
@@ -40,7 +47,7 @@ def chunk_diary_text(text, chunk_size=CHUNK_SIZE, overlap=CHUNK_OVERLAP):
 
 
 def embed_text(text):
-    response = client.embeddings.create(
+    response = get_openai_client().embeddings.create(
         model=EMBEDDING_MODEL,
         input=text,
     )

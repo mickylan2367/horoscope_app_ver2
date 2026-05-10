@@ -30,7 +30,14 @@ from .memory import (
     search_diary_chunks,
 )
 
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+_client = None
+
+
+def get_openai_client():
+    global _client
+    if _client is None:
+        _client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    return _client
 
 
 def plain_text_ai_reply(text, max_chars=None):
@@ -731,7 +738,7 @@ User message:
 
 Reply in Japanese unless the user wrote in another language.
 """.strip()
-    response = client.responses.create(
+    response = get_openai_client().responses.create(
         model="gpt-5.4",
         input=prompt,
     )

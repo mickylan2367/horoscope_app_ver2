@@ -1,4 +1,4 @@
-
+﻿
 from django.shortcuts import render
 from .models import (
     HoroscopeResult,
@@ -34,8 +34,17 @@ from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
 from diaryapp.memory import ensure_user_diary_index, search_diary_chunks
 
+_client = None
+
+
+def get_openai_client():
+    global _client
+    if _client is None:
+        _client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    return _client
+
+
 # まず必要なモノをロード
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 PLANETS421 = load('de421.bsp')
 PLANETS440 = load('de440s.bsp')
 TS = load.timescale()
@@ -219,7 +228,7 @@ def generate_ai_reading_geo(geo_payload):
 {json.dumps(geo_payload, ensure_ascii=False, indent=2)}
 """.strip()
     try:
-        response = client.responses.create(
+        response = get_openai_client().responses.create(
             model="gpt-5.4",
             input=prompt,
         )
@@ -260,7 +269,7 @@ def generate_ai_reading_helio(helio_payload):
 """.strip()
 
     try:
-        response = client.responses.create(
+        response = get_openai_client().responses.create(
             model="gpt-5.4",
             input=prompt,
         )
@@ -355,7 +364,7 @@ def generate_ai_tarot_interpretation(tarot_payload):
 {json.dumps(tarot_payload, ensure_ascii=False, indent=2)}
 """.strip()
     try:
-        response = client.responses.create(
+        response = get_openai_client().responses.create(
             model="gpt-5.4",
             input=prompt,
         )
@@ -443,7 +452,7 @@ User message:
 Reply in Japanese unless the user clearly wrote in another language.
 """.strip()
     try:
-        response = client.responses.create(
+        response = get_openai_client().responses.create(
             model="gpt-5.4",
             input=prompt,
         )
