@@ -3,6 +3,7 @@ from django.conf.urls.static import static
 from django.contrib import admin
 from django.http import FileResponse, Http404
 from django.urls import include, path
+from django.views.static import serve
 
 import chart.urls
 from chart import views as chart_views
@@ -50,6 +51,7 @@ urlpatterns = [
     path("api/tarot/readings/<int:pk>/", chart_views.api_tarot_reading_detail, name="api_tarot_reading_detail"),
     path("diary/", include("diaryapp.urls")),
     path("accounts/", include("django.contrib.auth.urls")),
+    path("media/<path:path>", serve, {"document_root": settings.MEDIA_ROOT}, name="media"),
     path("app/", react_app, name="react_app"),
     path("app/<path:path>", react_app, name="react_app_path"),
     path("", include(chart.urls)),

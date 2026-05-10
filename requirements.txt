@@ -1,9 +1,13 @@
 Django==5.0.3
+dj-database-url
+gunicorn
 matplotlib
 numpy
 openai
 pillow
+psycopg[binary]
 pytz
 requests
 skyfield
 markdown
+whitenoise
