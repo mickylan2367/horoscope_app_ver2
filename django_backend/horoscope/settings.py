@@ -40,6 +40,10 @@ def env_int(name, default=0):
     return int(value)
 
 
+def dedupe(items):
+    return list(dict.fromkeys(item for item in items if item))
+
+
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
 
@@ -52,13 +56,35 @@ SECRET_KEY = os.getenv(
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = env_bool("DEBUG", default=True)
 
-ALLOWED_HOSTS = env_list("ALLOWED_HOSTS", ["127.0.0.1", "localhost"])
-CSRF_TRUSTED_ORIGINS = env_list("CSRF_TRUSTED_ORIGINS", [
+default_allowed_hosts = [
+    "127.0.0.1",
+    "localhost",
+    "horoscope-app-ver2.onrender.com",
+    ".vercel.app",
+]
+render_external_hostname = os.getenv("RENDER_EXTERNAL_HOSTNAME")
+if render_external_hostname:
+    default_allowed_hosts.append(render_external_hostname)
+
+ALLOWED_HOSTS = dedupe(default_allowed_hosts + env_list("ALLOWED_HOSTS"))
+
+default_csrf_trusted_origins = [
     "http://127.0.0.1:5173",
     "http://127.0.0.1:5174",
     "http://localhost:5173",
     "http://localhost:5174",
-])
+    "https://horoscope-app-ver2.onrender.com",
+    "https://*.vercel.app",
+]
+vercel_url = os.getenv("VERCEL_URL")
+if vercel_url:
+    default_csrf_trusted_origins.append(f"https://{vercel_url}")
+if render_external_hostname:
+    default_csrf_trusted_origins.append(f"https://{render_external_hostname}")
+
+CSRF_TRUSTED_ORIGINS = dedupe(
+    default_csrf_trusted_origins + env_list("CSRF_TRUSTED_ORIGINS")
+)
 
 
 # Application definition
