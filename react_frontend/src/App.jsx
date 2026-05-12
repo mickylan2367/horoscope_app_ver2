@@ -26,6 +26,7 @@ function App() {
   const [user, setUser] = useState(null);
   const [authReady, setAuthReady] = useState(false);
   const basename = window.location.pathname.startsWith("/app") ? "/app" : "/";
+  const handleLogout = () => setUser(null);
 
   useEffect(() => {
     apiFetch("/api/auth/me/")
@@ -41,16 +42,16 @@ function App() {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/about" element={<AboutPage user={user} />} />
-        <Route path="/bookdesign" element={<BookDesign user={user} />} />
+        <Route path="/bookdesign" element={<BookDesign user={user} onLogout={handleLogout} />} />
         <Route path="/chart/warp" element={<ChartWarpPage />} />
-        <Route path="/chart" element={<ChartPage user={user} />} />
-        <Route path="/tarot" element={<TarotHomePage user={user} />} />
-        <Route path="/tarot/decks" element={<TarotDeckListPage user={user} />} />
-        <Route path="/tarot/decks/:deckId" element={<TarotDeckDetailPage user={user} />} />
-        <Route path="/tarot/decks/:deckId/cards/new" element={<TarotCardEditorPage user={user} />} />
-        <Route path="/tarot/cards/:cardId/edit" element={<TarotCardEditorPage user={user} />} />
-        <Route path="/tarot/read" element={<TarotReadingPage user={user} />} />
-        <Route path="/tarot/readings/:readingId" element={<TarotReadingDetailPage user={user} />} />
+        <Route path="/chart" element={<ChartPage user={user} onLogout={handleLogout} />} />
+        <Route path="/tarot" element={<TarotHomePage user={user} onLogout={handleLogout} />} />
+        <Route path="/tarot/decks" element={<TarotDeckListPage user={user} onLogout={handleLogout} />} />
+        <Route path="/tarot/decks/:deckId" element={<TarotDeckDetailPage user={user} onLogout={handleLogout} />} />
+        <Route path="/tarot/decks/:deckId/cards/new" element={<TarotCardEditorPage user={user} onLogout={handleLogout} />} />
+        <Route path="/tarot/cards/:cardId/edit" element={<TarotCardEditorPage user={user} onLogout={handleLogout} />} />
+        <Route path="/tarot/read" element={<TarotReadingPage user={user} onLogout={handleLogout} />} />
+        <Route path="/tarot/readings/:readingId" element={<TarotReadingDetailPage user={user} onLogout={handleLogout} />} />
         <Route path="/diary/warp" element={<DiaryWarpPage />} />
         <Route
           path="/diary"
@@ -64,7 +65,7 @@ function App() {
         <Route path="/diary/:id/edit" element={<DiaryEditPage user={user} isEdit />} />
         <Route path="/login" element={<LoginPage onAuth={setUser} />} />
         <Route path="/register" element={<RegisterPage onAuth={setUser} />} />
-        <Route path="/profile" element={<ProfilePage user={user} onAuth={setUser} />} />
+        <Route path="/profile" element={<ProfilePage user={user} onAuth={setUser} onLogout={handleLogout} />} />
         <Route path="/thank-you" element={<ThankYouPage />} />
       </Routes>
     </BrowserRouter>

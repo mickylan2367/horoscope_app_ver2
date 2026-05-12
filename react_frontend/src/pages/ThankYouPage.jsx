@@ -11,7 +11,7 @@ export default function ThankYouPage() {
             <p className="text-sm uppercase tracking-[0.32em] text-[#f4c2c2]">The spell is closed</p>
             <h1 className="mt-4 text-4xl font-semibold text-white md:text-5xl">Thank you</h1>
             <p className="mx-auto mt-5 max-w-xl text-sm leading-8 text-slate-200">
-              Your session has been gently sealed. When you return, the door will open again from a fresh login.
+              Your session has been gently sealed. <br /> When you return, the door will open again from a fresh login.
             </p>
           </div>
         </div>

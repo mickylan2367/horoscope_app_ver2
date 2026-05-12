@@ -30,7 +30,7 @@ const sortGroupedEntries = (groups) =>
     return left.localeCompare(right);
   });
 
-export default function BookDesign({ user }) {
+export default function BookDesign({ user, onLogout }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [profilesData, setProfilesData] = useState({
@@ -222,12 +222,13 @@ export default function BookDesign({ user }) {
   const closeAndLogout = useCallback(async () => {
     if (isAuthenticated) {
       await apiFetch("/api/auth/logout/", { method: "POST", body: "{}" });
-      navigate("/diary/warp", { state: { target: "/thank-you", reloadAfter: true, warpMode: "collapse" } });
+      onLogout?.();
+      navigate("/diary/warp", { state: { target: "/thank-you", warpMode: "collapse" } });
       return;
     }
 
     navigate("/diary/warp", { state: { target: "/" } });
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, navigate, onLogout]);
 
   const openDiaryBook = useCallback(() => {
     setIsOpeningDiary(true);

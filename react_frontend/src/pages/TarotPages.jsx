@@ -8,9 +8,9 @@ import { apiFetch } from "../api";
 const ARCANA_OPTIONS = ["major", "minor", "oracle"];
 const SUIT_OPTIONS = ["none", "cups", "pentacles", "swords", "wands"];
 
-function TarotShell({ children, user, wide = false, hideHeader = false, hideBackground = false }) {
+function TarotShell({ children, user, onLogout, wide = false, hideHeader = false, hideBackground = false }) {
   return (
-    <Layout user={user} wide={wide} headerVariant="cosmic" backgroundVariant="hero" hideHeader={hideHeader} hideBackground={hideBackground}>
+    <Layout user={user} onLogout={onLogout} wide={wide} headerVariant="cosmic" backgroundVariant="hero" hideHeader={hideHeader} hideBackground={hideBackground}>
       {children}
     </Layout>
   );
@@ -499,9 +499,9 @@ function TarotCardPreview({ card, editable = false }) {
   );
 }
 
-export function TarotHomePage({ user }) {
+export function TarotHomePage({ user, onLogout }) {
   return (
-    <TarotShell user={user}>
+    <TarotShell user={user} onLogout={onLogout}>
       <div className="mx-auto max-w-5xl">
         <div className="mb-8">
           <p className="mb-3 text-sm uppercase tracking-[0.28em] text-[#f4c2c2]">Tarot</p>
@@ -527,12 +527,11 @@ export function TarotHomePage({ user }) {
   );
 }
 
-export function TarotDeckListPage({ user }) {
+export function TarotDeckListPage({ user, onLogout }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [coverImage, setCoverImage] = useState("");
   const [coverImageFile, setCoverImageFile] = useState(null);
   const [deckType, setDeckType] = useState("tarot");
   const [allowReversed, setAllowReversed] = useState(true);
@@ -553,11 +552,11 @@ export function TarotDeckListPage({ user }) {
     setError("");
     try {
       const body = coverImageFile
-        ? Object.entries({ name, description, coverImage, deckType, allowReversed }).reduce((formData, [key, value]) => {
+        ? Object.entries({ name, description, deckType, allowReversed, isPublic: false }).reduce((formData, [key, value]) => {
             formData.append(key, value ?? "");
             return formData;
           }, new FormData())
-        : JSON.stringify({ name, description, coverImage, deckType, allowReversed });
+        : JSON.stringify({ name, description, deckType, allowReversed, isPublic: false });
       if (coverImageFile) {
         body.append("coverImageFile", coverImageFile);
       }
@@ -567,7 +566,6 @@ export function TarotDeckListPage({ user }) {
       });
       setName("");
       setDescription("");
-      setCoverImage("");
       setCoverImageFile(null);
       if (coverInputRef.current) {
         coverInputRef.current.value = "";
@@ -588,7 +586,7 @@ export function TarotDeckListPage({ user }) {
   }, [coverPreviewUrl]);
 
   return (
-    <TarotShell user={user} wide hideHeader hideBackground>
+    <TarotShell user={user} onLogout={onLogout} wide hideHeader hideBackground>
       <TarotLibraryPageFrame>
         <ErrorNotice message={error} />
         {!data ? <LoadingNotice /> : null}
@@ -607,17 +605,15 @@ export function TarotDeckListPage({ user }) {
                   <textarea className="tarot-library-input min-h-28 w-full rounded-xl px-4 py-3 text-white outline-none" placeholder="Description" value={description} onChange={(event) => setDescription(event.target.value)} />
                   <div className="tarot-library-cover-field grid gap-3 rounded-xl p-3">
                     <div className="tarot-library-cover-preview aspect-[3/2] overflow-hidden rounded-lg">
-                      {coverPreviewUrl || coverImage ? (
-                        <img src={coverPreviewUrl || coverImage} alt="Deck cover preview" className="h-full w-full object-cover" />
+                      {coverPreviewUrl ? (
+                        <img src={coverPreviewUrl} alt="Deck cover preview" className="h-full w-full object-cover" />
                       ) : (
                         <TarotCardArt card={{ name: name || "New Deck" }} compact />
                       )}
                     </div>
-                    <input className="tarot-library-input w-full rounded-xl px-4 py-3 text-white outline-none" placeholder="Cover image URL" value={coverImage} onChange={(event) => setCoverImage(event.target.value)} disabled={Boolean(coverImageFile)} />
                     <input ref={coverInputRef} className="hidden" type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => {
                       const file = event.target.files?.[0] ?? null;
                       setCoverImageFile(file);
-                      if (file) setCoverImage("");
                     }} />
                     <button className="tarot-library-soft-btn inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 font-semibold text-white transition" type="button" onClick={() => coverInputRef.current?.click()}>
                       <ImageIcon className="h-4 w-4" />
@@ -929,7 +925,7 @@ const tarotDeckLibraryStyles = `
   }
 `;
 
-export function TarotDeckDetailPage({ user }) {
+export function TarotDeckDetailPage({ user, onLogout }) {
   const { deckId } = useParams();
   const navigate = useNavigate();
   const coverInputRef = useRef(null);
@@ -937,8 +933,6 @@ export function TarotDeckDetailPage({ user }) {
   const [query, setQuery] = useState("");
   const [arcana, setArcana] = useState("all");
   const [error, setError] = useState("");
-  const [shareConfirmOpen, setShareConfirmOpen] = useState(false);
-  const [shareConfirmText, setShareConfirmText] = useState("");
   const [coverImageFile, setCoverImageFile] = useState(null);
   const coverPreviewUrl = useMemo(() => (coverImageFile ? URL.createObjectURL(coverImageFile) : ""), [coverImageFile]);
   const [deckForm, setDeckForm] = useState({
@@ -960,14 +954,12 @@ export function TarotDeckDetailPage({ user }) {
           coverImage: nextData.deck.coverImage ?? "",
           deckType: nextData.deck.deckType,
           allowReversed: nextData.deck.allowReversed,
-          isPublic: nextData.deck.isPublic,
+          isPublic: false,
         });
         setCoverImageFile(null);
         if (coverInputRef.current) {
           coverInputRef.current.value = "";
         }
-        setShareConfirmOpen(false);
-        setShareConfirmText("");
       })
       .catch((err) => setError(err.message || "Failed to load deck."));
   }, [deckId]);
@@ -1000,12 +992,19 @@ export function TarotDeckDetailPage({ user }) {
     event.preventDefault();
     setError("");
     try {
+      const deckPayload = {
+        name: deckForm.name,
+        description: deckForm.description,
+        deckType: deckForm.deckType,
+        allowReversed: deckForm.allowReversed,
+        isPublic: false,
+      };
       const body = coverImageFile
-        ? Object.entries(deckForm).reduce((formData, [key, value]) => {
+        ? Object.entries(deckPayload).reduce((formData, [key, value]) => {
             formData.append(key, value ?? "");
             return formData;
           }, new FormData())
-        : JSON.stringify(deckForm);
+        : JSON.stringify(deckPayload);
       if (coverImageFile) {
         body.append("coverImageFile", coverImageFile);
       }
@@ -1014,7 +1013,7 @@ export function TarotDeckDetailPage({ user }) {
         body,
       });
       setData((current) => current ? { ...current, deck: updatedDeck } : current);
-      setDeckForm((current) => ({ ...current, coverImage: updatedDeck.coverImage ?? "" }));
+      setDeckForm((current) => ({ ...current, coverImage: updatedDeck.coverImage ?? "", isPublic: false }));
       setCoverImageFile(null);
       if (coverInputRef.current) {
         coverInputRef.current.value = "";
@@ -1035,42 +1034,8 @@ export function TarotDeckDetailPage({ user }) {
     }
   };
 
-  const publishDeck = async () => {
-    const expectedName = deckForm.name.trim();
-    if (!expectedName || shareConfirmText !== expectedName) return;
-    setError("");
-    try {
-      const updatedDeck = await apiFetch(`/api/tarot/decks/${deckId}/`, {
-        method: "PUT",
-        body: JSON.stringify({ ...deckForm, isPublic: true }),
-      });
-      setData((current) => current ? { ...current, deck: updatedDeck } : current);
-      setDeckForm((current) => ({ ...current, isPublic: true }));
-      setShareConfirmOpen(false);
-      setShareConfirmText("");
-    } catch (err) {
-      setError(err.message || "Failed to share deck.");
-    }
-  };
-
-  const unpublishDeck = async () => {
-    setError("");
-    try {
-      const updatedDeck = await apiFetch(`/api/tarot/decks/${deckId}/`, {
-        method: "PUT",
-        body: JSON.stringify({ ...deckForm, isPublic: false }),
-      });
-      setData((current) => current ? { ...current, deck: updatedDeck } : current);
-      setDeckForm((current) => ({ ...current, isPublic: false }));
-      setShareConfirmOpen(false);
-      setShareConfirmText("");
-    } catch (err) {
-      setError(err.message || "Failed to make deck private.");
-    }
-  };
-
   return (
-    <TarotShell user={user} wide hideHeader hideBackground>
+    <TarotShell user={user} onLogout={onLogout} wide hideHeader hideBackground>
       <TarotLibraryPageFrame showDeckListButton>
         <ErrorNotice message={error} />
         {!data ? <LoadingNotice /> : null}
@@ -1137,13 +1102,6 @@ export function TarotDeckDetailPage({ user }) {
                           <TarotCardArt card={{ name: deckForm.name || "Deck" }} compact />
                         )}
                       </div>
-                      <input
-                        className="w-full rounded-xl border border-white/10 bg-white/8 px-4 py-3 text-white outline-none"
-                        placeholder="Cover image URL"
-                        value={deckForm.coverImage}
-                        onChange={(event) => setDeckForm((current) => ({ ...current, coverImage: event.target.value }))}
-                        disabled={Boolean(coverImageFile)}
-                      />
                       <input ref={coverInputRef} className="hidden" type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => {
                         const file = event.target.files?.[0] ?? null;
                         setCoverImageFile(file);
@@ -1186,72 +1144,13 @@ export function TarotDeckDetailPage({ user }) {
                     <div className="rounded-xl border border-white/10 bg-white/6 p-4">
                       <div className="flex items-start justify-between gap-3">
                         <div>
-                          <p className="text-sm font-semibold text-white">
-                            {deckForm.isPublic ? "Shared Deck" : "Private Deck"}
-                          </p>
+                          <p className="text-sm font-semibold text-white">Private Deck</p>
                           <p className="mt-2 text-sm leading-6 text-slate-300">
-                            {deckForm.isPublic
-                              ? "Other users can browse and draw from this deck."
-                              : "Share this deck after checking the cards and description."}
+                            Personal decks stay private while sharing is paused.
                           </p>
                         </div>
-                        <span className={`rounded-full px-2.5 py-1 text-xs ${deckForm.isPublic ? "bg-emerald-300/14 text-emerald-100" : "bg-white/8 text-slate-300"}`}>
-                          {deckForm.isPublic ? "PUBLIC" : "PRIVATE"}
-                        </span>
+                        <span className="rounded-full bg-white/8 px-2.5 py-1 text-xs text-slate-300">PRIVATE</span>
                       </div>
-
-                      {deckForm.isPublic ? (
-                        <button
-                          className="mt-4 inline-flex w-full items-center justify-center rounded-full border border-white/12 bg-white/8 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/12"
-                          type="button"
-                          onClick={unpublishDeck}
-                        >
-                          Make private
-                        </button>
-                      ) : (
-                        <>
-                          {shareConfirmOpen ? (
-                            <div className="mt-4 space-y-3">
-                              <p className="text-sm leading-6 text-slate-300">
-                                Type <span className="font-semibold text-white">{deckForm.name}</span> to confirm sharing.
-                              </p>
-                              <input
-                                className="w-full rounded-xl border border-white/10 bg-[#221a32] px-4 py-3 text-white outline-none"
-                                value={shareConfirmText}
-                                onChange={(event) => setShareConfirmText(event.target.value)}
-                              />
-                              <div className="flex gap-2">
-                                <button
-                                  className="inline-flex flex-1 items-center justify-center rounded-full bg-[#f4c2c2] px-4 py-2.5 text-sm font-semibold text-[#2a2036] disabled:cursor-not-allowed disabled:opacity-45"
-                                  type="button"
-                                  disabled={shareConfirmText !== deckForm.name.trim()}
-                                  onClick={publishDeck}
-                                >
-                                  Share Deck
-                                </button>
-                                <button
-                                  className="inline-flex items-center justify-center rounded-full border border-white/12 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/10"
-                                  type="button"
-                                  onClick={() => {
-                                    setShareConfirmOpen(false);
-                                    setShareConfirmText("");
-                                  }}
-                                >
-                                  Cancel
-                                </button>
-                              </div>
-                            </div>
-                          ) : (
-                            <button
-                              className="mt-4 inline-flex w-full items-center justify-center rounded-full border border-[#f4c2c2]/40 bg-[#f4c2c2]/12 px-4 py-2.5 text-sm font-semibold text-[#ffdbe3] transition hover:bg-[#f4c2c2]/18"
-                              type="button"
-                              onClick={() => setShareConfirmOpen(true)}
-                            >
-                              Share Deck
-                            </button>
-                          )}
-                        </>
-                      )}
                     </div>
                     <div className="flex gap-3">
                       <button className="inline-flex flex-1 items-center justify-center gap-2 rounded-full bg-[#f4c2c2] px-5 py-3 font-semibold text-[#2a2036]" type="submit">
@@ -1272,7 +1171,7 @@ export function TarotDeckDetailPage({ user }) {
   );
 }
 
-export function TarotCardEditorPage({ user }) {
+export function TarotCardEditorPage({ user, onLogout }) {
   const { deckId, cardId } = useParams();
   const navigate = useNavigate();
   const imageInputRef = useRef(null);
@@ -1328,9 +1227,6 @@ export function TarotCardEditorPage({ user }) {
   const handleImageFile = (event) => {
     const file = event.target.files?.[0] ?? null;
     setImageFile(file);
-    if (file) {
-      setForm((current) => ({ ...current, image: "" }));
-    }
   };
   const submit = async (event) => {
     event.preventDefault();
@@ -1343,6 +1239,7 @@ export function TarotCardEditorPage({ user }) {
       order: Number(form.order || 0),
       keywords: form.keywords.split(",").map((keyword) => keyword.trim()).filter(Boolean),
     };
+    delete payload.image;
     const body = imageFile
       ? Object.entries(payload).reduce((formData, [key, value]) => {
           formData.append(key, Array.isArray(value) ? JSON.stringify(value) : value ?? "");
@@ -1377,7 +1274,7 @@ export function TarotCardEditorPage({ user }) {
   };
 
   return (
-    <TarotShell user={user}>
+    <TarotShell user={user} onLogout={onLogout}>
       <Panel className="mx-auto max-w-3xl">
         <p className="mb-2 text-sm uppercase tracking-[0.28em] text-[#f4c2c2]">Tarot / Card</p>
         <h1 className="text-3xl font-semibold text-white">{cardId ? "Edit Card" : "Create Card"}</h1>
@@ -1396,8 +1293,7 @@ export function TarotCardEditorPage({ user }) {
           <input className="rounded-xl border border-white/10 bg-white/8 px-4 py-3 text-white outline-none" placeholder="Keywords, comma separated" value={form.keywords} onChange={updateField("keywords")} />
           <textarea className="min-h-32 rounded-xl border border-white/10 bg-white/8 px-4 py-3 text-white outline-none" placeholder="Upright meaning" value={form.uprightMeaning} onChange={updateField("uprightMeaning")} />
           <textarea className="min-h-32 rounded-xl border border-white/10 bg-white/8 px-4 py-3 text-white outline-none" placeholder="Reversed meaning" value={form.reversedMeaning} onChange={updateField("reversedMeaning")} />
-          <div className="grid gap-3 md:grid-cols-[1fr_auto]">
-            <input className="rounded-xl border border-white/10 bg-white/8 px-4 py-3 text-white outline-none" placeholder="Image URL" value={form.image} onChange={updateField("image")} disabled={Boolean(imageFile)} />
+          <div className="grid gap-3">
             <input ref={imageInputRef} className="hidden" type="file" accept="image/jpeg,image/png,image/webp" onChange={handleImageFile} />
             <button className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/12 bg-white/8 px-4 py-3 font-semibold text-white transition hover:bg-white/12" type="button" onClick={chooseImage}>
               <ImageIcon className="h-4 w-4" />
@@ -1432,7 +1328,7 @@ export function TarotCardEditorPage({ user }) {
             <div>
               <p className="text-sm font-semibold text-white">Card image preview</p>
               <p className="mt-2 text-sm leading-6 text-slate-300">
-                {previewImage ? "This image will be shown on the card." : "Choose an image file or enter an image URL."}
+                {previewImage ? "This image will be shown on the card." : "Choose an image file."}
               </p>
             </div>
           </div>
@@ -1452,9 +1348,9 @@ export function TarotCardEditorPage({ user }) {
   );
 }
 
-export function TarotReadingPage({ user }) {
+export function TarotReadingPage({ user, onLogout }) {
   return (
-    <TarotShell user={user} wide>
+    <TarotShell user={user} onLogout={onLogout} wide>
       <TarotReadingContent />
     </TarotShell>
   );
@@ -1849,7 +1745,7 @@ export function TarotReadingMessage({ result }) {
   );
 }
 
-export function TarotReadingDetailPage({ user }) {
+export function TarotReadingDetailPage({ user, onLogout }) {
   const { readingId } = useParams();
   const navigate = useNavigate();
   const [reading, setReading] = useState(null);
@@ -1880,7 +1776,7 @@ export function TarotReadingDetailPage({ user }) {
   };
 
   return (
-    <TarotShell user={user} wide>
+    <TarotShell user={user} onLogout={onLogout} wide>
       <div className="mx-auto max-w-5xl">
         <ErrorNotice message={error} />
         {!reading ? <LoadingNotice /> : null}

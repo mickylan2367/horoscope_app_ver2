@@ -25,6 +25,11 @@ export default function RegisterPage({ onAuth }) {
     }
   };
 
+  const labelFor = (field) => {
+    if (field === "email") return "email (optional)";
+    return field.replace("1", "").replace("2", " confirmation");
+  };
+
   return (
     <Layout user={null} headerVariant="cosmic" hideAuthActions>
       <form
@@ -33,12 +38,12 @@ export default function RegisterPage({ onAuth }) {
       >
         <h1 className="mb-3 text-3xl font-bold tracking-[0.08em] text-[#f4eeff]">NEW ACCOUNT</h1>
         <p className="mb-6 text-sm leading-7 text-slate-300">
-          Create an account to save your chart history and diary flow.
+          Create a LovelyWitch Life account to save your chart history and diary flow.
         </p>
         {error ? <p className="mb-4 rounded-2xl border border-rose-400/20 bg-rose-400/10 px-4 py-3 text-sm text-rose-200">{error}</p> : null}
         {["username", "email", "password1", "password2"].map((field) => (
           <div key={field}>
-            <label className="mb-2 block text-sm font-medium capitalize text-slate-200">{field.replace("1", "").replace("2", " confirmation")}</label>
+            <label className="mb-2 block text-sm font-medium capitalize text-slate-200">{labelFor(field)}</label>
             <input
               className="mb-4 w-full rounded-full border border-white/12 bg-[#2a2146]/75 px-4 py-3 text-white placeholder:text-slate-300 outline-none transition focus:border-white/20 focus:bg-[#332953]/82"
               type={field.startsWith("password") ? "password" : "text"}
@@ -65,15 +70,14 @@ export default function RegisterPage({ onAuth }) {
 
         <button
           type="button"
-          disabled
-          className="flex w-full cursor-not-allowed items-center justify-center gap-2 rounded-full border border-white/12 bg-white/8 px-6 py-3.5 text-base font-medium text-slate-200 opacity-85"
+          onClick={() => navigate("/chart/warp", { state: { source: "skip-auth" } })}
+          className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-full border border-white/12 bg-white/8 px-6 py-3.5 text-base font-medium text-slate-200 transition hover:-translate-y-0.5 hover:border-white/20 hover:bg-white/12 hover:text-white active:translate-y-0"
         >
-          Continue with Google
+          Set up later
         </button>
         <p className="mt-3 text-center text-xs text-slate-400">
-          Google signup will be added here.
+          You can create an account or sign in later.
         </p>
-
       </form>
     </Layout>
   );

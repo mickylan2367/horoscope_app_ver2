@@ -3,6 +3,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from .models import Diary, DiaryImage, DiaryMemoryChunk, Profile
 from .forms import DiaryForm,DiaryImageFormSet
 import markdown
+import bleach
 from django.contrib.auth.forms import UserCreationForm,PasswordChangeForm
 from .forms import RegisterForm, ProfileForm,UserUpdateForm
 from django.contrib.auth import authenticate, login, logout
@@ -56,6 +57,51 @@ def plain_text_ai_reply(text, max_chars=None):
         return clipped.rstrip("、, \n") + "..."
     return text
 
+
+ALLOWED_MARKDOWN_TAGS = {
+    "a",
+    "blockquote",
+    "br",
+    "code",
+    "em",
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "h5",
+    "h6",
+    "li",
+    "ol",
+    "p",
+    "pre",
+    "strong",
+    "table",
+    "tbody",
+    "td",
+    "th",
+    "thead",
+    "tr",
+    "ul",
+}
+ALLOWED_MARKDOWN_ATTRIBUTES = {
+    "a": ["href", "title"],
+    "th": ["align"],
+    "td": ["align"],
+}
+ALLOWED_MARKDOWN_PROTOCOLS = {"http", "https", "mailto"}
+
+
+def render_safe_markdown(content):
+    html = markdown.markdown(content or "", extensions=["fenced_code", "tables"])
+    return bleach.clean(
+        html,
+        tags=ALLOWED_MARKDOWN_TAGS,
+        attributes=ALLOWED_MARKDOWN_ATTRIBUTES,
+        protocols=ALLOWED_MARKDOWN_PROTOCOLS,
+        strip=True,
+    )
+
+
 def home(request):
     return render(request, 'diaryapp/home.html')
 
@@ -64,7 +110,7 @@ def home(request):
 def diary_list(request):
     diaries = Diary.objects.filter(user=request.user).order_by('-date')
     for diary in diaries:
-        diary.rendered_content = markdown.markdown(diary.content, extensions=['fenced_code', 'tables'])
+        diary.rendered_content = render_safe_markdown(diary.content)
 
     nav_profile = None
     if request.user.is_authenticated:
@@ -309,10 +355,7 @@ def _delete_image_file(image):
 def _diary_payload(diary, include_rendered=True):
     rendered_content = ""
     if include_rendered:
-        rendered_content = markdown.markdown(
-            diary.content,
-            extensions=["fenced_code", "tables"]
-        )
+        rendered_content = render_safe_markdown(diary.content)
     return {
         "id": diary.pk,
         "title": diary.title,
@@ -463,10 +506,7 @@ def api_markdown_preview(request):
     except json.JSONDecodeError:
         return JsonResponse({"error": "Invalid JSON"}, status=400)
 
-    html = markdown.markdown(
-        data.get("content", ""),
-        extensions=["fenced_code", "tables"]
-    )
+    html = render_safe_markdown(data.get("content", ""))
     return JsonResponse({"html": html})
 
 
