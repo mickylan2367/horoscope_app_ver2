@@ -576,7 +576,7 @@ def api_diary_collection(request):
         return api_diary_list(request)
     return api_diary_create(request)
 
-@require_http_methods(["GET", "PUT"])
+@require_http_methods(["GET", "PUT", "DELETE"])
 def api_diary_detail(request, pk):
     auth_error = _login_required_json(request)
     if auth_error:
@@ -590,6 +590,12 @@ def api_diary_detail(request, pk):
 
     if request.method == "GET":
         return JsonResponse(_diary_payload(diary))
+
+    if request.method == "DELETE":
+        for image in diary.images.all():
+            _delete_image_file(image)
+        diary.delete()
+        return JsonResponse({"ok": True})
 
     if request.content_type and request.content_type.startswith("multipart/form-data"):
         data = request.POST

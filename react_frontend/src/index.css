@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+.home-content-scale {
+  zoom: 0.8;
+}
+
 .diary-snippet {
   display: -webkit-box;
   -webkit-box-orient: vertical;
@@ -366,15 +370,3 @@
   object-fit: contain;
 }
 
-.result-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.result-table th,
-.result-table td {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-  padding: 10px;
-  text-align: center;
-  word-break: break-word;
-}

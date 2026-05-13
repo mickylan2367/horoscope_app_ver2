@@ -933,8 +933,6 @@ def _calculate_chart(data, user, include_ai=False, save_profile=False):
             "lat": lat,
             "lon": lon,
         },
-        "resultGeo": result_json.get("geo"),
-        "resultHelio": result_json.get("helio"),
         "aiTextGeo": result_json.get("ai_text_geo"),
         "aiTextHelio": result_json.get("ai_text_helio"),
         "chartGeoUrl": result_json.get("chart_url"),

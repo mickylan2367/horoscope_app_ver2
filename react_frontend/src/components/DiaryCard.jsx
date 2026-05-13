@@ -1,6 +1,7 @@
 import { memo, useMemo, useState } from "react";
+import { X } from "lucide-react";
 
-function DiaryCard({ diary, isActive = false, cardRef, deferImages = false, onOpenEdit }) {
+function DiaryCard({ diary, isActive = false, cardRef, deferImages = false, onOpenEdit, onDelete }) {
   const [selectedImage, setSelectedImage] = useState(null);
   const visibleImages = useMemo(() => diary.images?.slice(0, 3) ?? [], [diary.images]);
   const hiddenCount = Math.max((diary.images?.length ?? 0) - visibleImages.length, 0);
@@ -22,13 +23,29 @@ function DiaryCard({ diary, isActive = false, cardRef, deferImages = false, onOp
         isTarot ? "cursor-pointer" : ""
       } ${
         isActive ? "ring-2 ring-[#f4c2c2] ring-offset-4 ring-offset-[#070b17]/40" : ""
-      }`}
+      } relative`}
       style={{
         contentVisibility: "auto",
         containIntrinsicSize: "420px",
       }}
       >
-        <div className="mb-4 flex items-start justify-between gap-4">
+        {onDelete ? (
+          <button
+            type="button"
+            aria-label={isTarot ? "Delete tarot reading" : "Delete diary"}
+            onClick={(event) => {
+              event.stopPropagation();
+              onDelete(diary);
+            }}
+            onKeyDown={(event) => {
+              event.stopPropagation();
+            }}
+            className="absolute left-3 top-3 z-10 inline-flex h-7 w-7 items-center justify-center rounded-full border border-white/12 bg-white/8 text-white/70 shadow-[0_8px_18px_rgba(0,0,0,0.18)] transition hover:-translate-y-0.5 hover:border-rose-200/45 hover:bg-rose-300/16 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#f4c2c2]"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        ) : null}
+        <div className="mb-4 flex items-start justify-between gap-4 pl-6">
           <div>
           <h3 className="text-2xl font-bold text-[#fbfcff]">{diary.date}</h3>
           {diary.title && diary.title !== diary.date ? (

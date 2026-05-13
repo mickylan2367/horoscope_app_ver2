@@ -114,3 +114,22 @@ class DiarySecondSelfTests(TestCase):
         self.assertEqual(response.json()["content"], raw_content)
         self.assertNotIn("<script", response.json()["renderedContent"])
         self.assertIn("<strong>safe</strong>", response.json()["renderedContent"])
+
+    def test_diary_delete_removes_related_memory_chunks(self):
+        self.client.force_login(self.user)
+        DiaryMemoryChunk.objects.create(
+            user=self.user,
+            diary=self.diary,
+            chunk_index=0,
+            source_date=self.diary.date,
+            source_title=self.diary.title,
+            text="The Star walk",
+            text_hash="hash",
+            embedding=[1.0, 0.0],
+        )
+
+        response = self.client.delete(reverse("api_diary_detail_root", args=[self.diary.pk]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(Diary.objects.filter(pk=self.diary.pk).exists())
+        self.assertFalse(DiaryMemoryChunk.objects.filter(diary=self.diary).exists())

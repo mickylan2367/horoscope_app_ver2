@@ -336,8 +336,9 @@ export default function BookDesign({ user, onLogout }) {
                 type="button"
                 className="guest-button"
                 onClick={closeAndLogout}
+                aria-label="Exit"
               >
-                CLOSE & LOGOUT
+                ×
               </button>
             </div>
           </div>
@@ -423,7 +424,7 @@ export default function BookDesign({ user, onLogout }) {
                   <div className="chooser-eyebrow">Tarot</div>
                   <h3>Open Tarot Room</h3>
                   <p>
-                    Enter the tarot app to draw cards, browse decks, and keep saved readings.
+                    Enter the tarot app to draw cards, browse decks.
                   </p>
                 </div>
               </button>
@@ -561,22 +562,6 @@ export default function BookDesign({ user, onLogout }) {
             </div>
           </div>
         ),
-      });
-    }
-
-    if (result?.resultGeo) {
-      items.push({
-        key: "geo",
-        title: "GEOCENTRIC",
-        content: <ResultTable rows={result.resultGeo} type="geo" />,
-      });
-    }
-
-    if (result?.resultHelio) {
-      items.push({
-        key: "helio",
-        title: "HELIOCENTRIC",
-        content: <ResultTable rows={result.resultHelio} type="helio" />,
       });
     }
 
@@ -766,7 +751,7 @@ export default function BookDesign({ user, onLogout }) {
               {pages.map((page, index) => (
                 <section
                   key={page.key}
-                  className={`page ${index === currentPage ? "active" : "hidden"}`}
+                  className={`page page-${page.key} ${index === currentPage ? "active" : "hidden"}`}
                 >
                   <h2 className="reading-title">{page.title}</h2>
                   {page.subtitle ? <p className="reading-subtitle">{page.subtitle}</p> : null}
@@ -848,7 +833,6 @@ export default function BookDesign({ user, onLogout }) {
             </div>
           </div>
 
-          <footer className="footer">@2025 Horoscope App</footer>
         </div>
       </div>
     </>
@@ -1009,49 +993,6 @@ function ProfileIndex({ entries, emptyMessage, interactive = false, onSelect, no
   );
 }
 
-function ResultTable({ rows, type }) {
-  return (
-    <div className="reading-body">
-      <table className="result-table">
-        <thead>
-          <tr>
-            <th>Planet</th>
-            <th>Meaning</th>
-            <th>Sign</th>
-            <th>Degree</th>
-            <th>Sabian</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row, index) => (
-            <tr key={`${row[0]}-${index}`}>
-              {type === "geo" ? (
-                <>
-                  <td>{row[0]}</td>
-                  <td>{row[6]}</td>
-                  <td>
-                    {row[1]} {row[2]}
-                  </td>
-                  <td>{row[5]}</td>
-                  <td>{row[4]}</td>
-                </>
-              ) : (
-                <>
-                  <td>{row[0]}</td>
-                  <td>{row[4]}</td>
-                  <td>{row[1]}</td>
-                  <td>{row[2]}</td>
-                  <td>{row[3]}</td>
-                </>
-              )}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
 const sharedStyles = `
   * {
     box-sizing: border-box;
@@ -1071,7 +1012,8 @@ const sharedStyles = `
 
   .app-shell {
     position: relative;
-    min-height: calc(100vh - 81px);
+    min-height: 100vh;
+    min-height: 100dvh;
     overflow: hidden;
     background:
       radial-gradient(circle at 15% 20%, rgba(196, 136, 255, 0.18), transparent 26%),
@@ -1127,9 +1069,12 @@ const sharedStyles = `
   }
 
   .book-shell {
-    width: min(760px, calc(100vw - 28px));
-    height: calc(100vh - 80px);
-    margin: 18px auto 24px;
+    width: min(680px, calc(100vw - 40px), calc((100dvh - 24px) * 0.78));
+    height: calc(100vh - 24px);
+    height: calc(100dvh - 24px);
+    min-height: min(680px, calc(100dvh - 24px));
+    max-height: 900px;
+    margin: 8px auto 8px;
     padding-top: 0;
     display: flex;
     flex-direction: column;
@@ -1200,9 +1145,9 @@ const sharedStyles = `
   .page {
     position: absolute;
     inset: 0;
-    padding: 36px 44px 88px 48px;
+    padding: 26px 28px 66px 40px;
     margin-left: 0;
-    border-radius: 22px;
+    border-radius: 18px;
     background:
       radial-gradient(circle at top left, rgba(143, 168, 255, 0.08), transparent 28%),
       linear-gradient(135deg, rgba(31, 34, 56, 0.18), rgba(42, 47, 77, 0.12));
@@ -1275,19 +1220,20 @@ const sharedStyles = `
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     align-content: center;
-    max-width: 720px;
+    max-width: 520px;
     margin: 0 auto;
-    gap: 18px;
-    padding: 34px 8px 12px;
+    gap: 14px;
+    padding: 24px 4px 10px 18px;
   }
 
   .book-tarot-reading-content,
   .book-tarot-result-content {
     flex: 1;
     min-height: 0;
-    margin: -10px -14px -44px -22px;
+    margin: -8px -10px -40px -18px;
+    overflow-x: hidden;
     overflow-y: auto;
-    padding: 8px 12px 78px 32px;
+    padding: 4px 10px 66px 26px;
     scrollbar-width: none;
   }
 
@@ -1303,14 +1249,55 @@ const sharedStyles = `
 
   .book-tarot-reading-content .tarot-reading-embedded {
     align-items: start;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .book-tarot-reading-content .tarot-reading-sheet {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    width: calc(100% + 12px);
+    min-height: min(100%, 502px);
+    overflow: hidden;
+    padding: 0;
+    border: none;
+    background: transparent;
+    box-shadow: none;
   }
 
   .book-tarot-message-scroll {
     max-height: 100%;
     overflow-y: auto;
-    padding-left: 18px;
-    padding-right: 8px;
+    padding-left: 12px;
+    padding-right: 6px;
     scrollbar-width: none;
+  }
+
+  .book-tarot-result-content .tarot-reading-card-live {
+    padding: 8px;
+    border-radius: 12px;
+  }
+
+  .book-tarot-result-content .tarot-reading-card-face {
+    margin-bottom: 7px;
+    border-radius: 9px;
+  }
+
+  .book-tarot-result-content .tarot-reading-card-live h3 {
+    margin-top: 7px;
+    font-size: 14px;
+  }
+
+  .book-tarot-result-content .tarot-reading-card-live p:last-child {
+    margin-top: 7px;
+    font-size: 12px;
+    line-height: 1.4;
+  }
+
+  .book-tarot-result-content > div {
+    gap: 9px;
   }
 
   .book-tarot-message-scroll > div {
@@ -1332,7 +1319,7 @@ const sharedStyles = `
 
   .book-tarot-consult-content {
     display: flex;
-    padding-bottom: 90px;
+    padding-bottom: 82px;
   }
 
   .tarot-consult-panel {
@@ -1340,7 +1327,7 @@ const sharedStyles = `
     width: 100%;
     display: grid;
     grid-template-rows: auto auto minmax(0, 1fr) auto auto;
-    gap: 12px;
+    gap: 10px;
     color: #f5f7ff;
   }
 
@@ -1348,17 +1335,17 @@ const sharedStyles = `
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
-    gap: 14px;
+    gap: 10px;
     border: 1px solid rgba(255,255,255,0.12);
     border-radius: 16px;
     background: rgba(255,255,255,0.07);
-    padding: 14px;
+    padding: 12px;
   }
 
   .tarot-consult-summary h3 {
     margin: 4px 0 0;
     color: #fff;
-    font-size: 18px;
+    font-size: 16px;
     line-height: 1.4;
   }
 
@@ -1399,13 +1386,13 @@ const sharedStyles = `
   }
 
   .tarot-consult-message {
-    max-width: 88%;
+    max-width: 92%;
     border: 1px solid rgba(255,255,255,0.12);
     border-radius: 16px;
-    padding: 12px 14px;
+    padding: 10px 12px;
     white-space: pre-line;
-    font-size: 14px;
-    line-height: 1.75;
+    font-size: 13px;
+    line-height: 1.65;
   }
 
   .tarot-consult-message-assistant {
@@ -1432,28 +1419,28 @@ const sharedStyles = `
 
   .tarot-consult-form {
     display: grid;
-    grid-template-columns: minmax(0, 4fr) minmax(88px, 1fr);
-    gap: 10px;
+    grid-template-columns: minmax(0, 4fr) minmax(78px, 1fr);
+    gap: 8px;
     align-items: stretch;
-    margin-bottom: 34px;
+    margin-bottom: 26px;
   }
 
   .tarot-consult-form textarea {
     width: 100%;
-    min-height: 74px;
+    min-height: 66px;
     resize: vertical;
     border: 1px solid rgba(255,255,255,0.14);
     border-radius: 14px;
     background: rgba(255,255,255,0.08);
     color: #fff;
-    padding: 12px 14px;
+    padding: 10px 12px;
     outline: none;
   }
 
   .tarot-consult-form button {
     position: relative;
     overflow: hidden;
-    min-height: 46px;
+    min-height: 42px;
     width: 100%;
     border: 1px solid rgba(244,194,194,0.52);
     border-radius: 12px;
@@ -1461,7 +1448,7 @@ const sharedStyles = `
       radial-gradient(circle at 24% 22%, rgba(255,255,255,0.28), transparent 24%),
       linear-gradient(135deg, rgba(244,194,194,0.26), rgba(216,196,255,0.14));
     color: #ffe4ec;
-    padding: 0 18px;
+    padding: 0 14px;
     font-weight: 800;
     letter-spacing: 0.08em;
     cursor: pointer;
@@ -1516,35 +1503,32 @@ const sharedStyles = `
   .book-tarot-reading-content section,
   .book-tarot-result-content section {
     border-radius: 16px;
-    padding: 16px;
+    padding: 12px;
   }
 
-  .book-tarot-reading-content section:first-child {
-    border-color: transparent;
-    background: transparent;
-    box-shadow: none;
-    padding: 0 12px 10px;
+  .book-tarot-reading-content section:first-child:not(.tarot-reading-sheet) {
+    padding: 0 8px 8px;
   }
 
   .book-tarot-reading-content .min-h-\\[420px\\],
   .book-tarot-result-content .min-h-\\[420px\\] {
-    min-height: 320px;
+    min-height: 280px;
   }
 
   .tarot-index-card {
-    min-height: 260px;
+    min-height: 220px;
     display: flex;
     flex-direction: column;
     justify-content: flex-end;
-    gap: 10px;
+    gap: 8px;
     border: 1px solid rgba(255,255,255,0.16);
-    border-radius: 18px;
+    border-radius: 16px;
     background:
       radial-gradient(circle at 50% 24%, rgba(255, 232, 176, 0.18), transparent 28%),
       linear-gradient(150deg, rgba(46, 38, 76, 0.82), rgba(244, 194, 194, 0.18));
     color: #fff;
     text-align: left;
-    padding: 20px;
+    padding: 16px;
     cursor: pointer;
     box-shadow:
       0 16px 36px rgba(0,0,0,0.2),
@@ -1993,10 +1977,10 @@ const sharedStyles = `
   }
 
   .reading-title {
-    margin: 0 0 12px;
-    padding-left: 12px;
-    border-left: 4px solid #8fa8ff;
-    font-size: 24px;
+    margin: 0 0 8px;
+    padding-left: 10px;
+    border-left: 3px solid #8fa8ff;
+    font-size: 20px;
     font-weight: 700;
     letter-spacing: 0.08em;
     color: #f7f8ff;
@@ -2005,10 +1989,10 @@ const sharedStyles = `
   }
 
   .reading-subtitle {
-    margin: 0 0 18px;
-    padding-left: 12px;
-    font-size: 13px;
-    letter-spacing: 0.16em;
+    margin: 0 0 12px;
+    padding-left: 10px;
+    font-size: 12px;
+    letter-spacing: 0.14em;
     color: rgba(220, 228, 255, 0.72);
     text-transform: uppercase;
     flex-shrink: 0;
@@ -2019,15 +2003,15 @@ const sharedStyles = `
     min-height: 0;
     display: flex;
     flex-direction: column;
-    padding: 8px 10px 0;
+    padding: 6px 6px 0;
     border-radius: 18px;
     background: transparent;
     backdrop-filter: none;
   }
 
   .index-note {
-    margin: 0 0 14px;
-    font-size: 12px;
+    margin: 0 0 12px;
+    font-size: 11px;
     letter-spacing: 0.14em;
     text-transform: uppercase;
     color: rgba(220, 228, 255, 0.72);
@@ -2053,13 +2037,13 @@ const sharedStyles = `
   }
 
   .index-group {
-    margin-bottom: 28px;
+    margin-bottom: 22px;
   }
 
   .index-letter {
-    margin: 0 0 12px;
-    padding-bottom: 6px;
-    font-size: 22px;
+    margin: 0 0 10px;
+    padding-bottom: 5px;
+    font-size: 20px;
     font-weight: 600;
     color: #d9deff;
     border-bottom: 1px solid rgba(180, 190, 255, 0.22);
@@ -2068,8 +2052,8 @@ const sharedStyles = `
 
   .index-list {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: 10px 18px;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 8px 12px;
   }
 
   .index-name-btn {
@@ -2077,8 +2061,8 @@ const sharedStyles = `
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 12px;
-    padding: 10px 14px;
+    gap: 10px;
+    padding: 8px 11px;
     border: 1px solid rgba(180, 190, 255, 0.16);
     border-radius: 12px;
     background: rgba(255, 255, 255, 0.04);
@@ -2124,7 +2108,7 @@ const sharedStyles = `
   }
 
   .index-name {
-    font-size: 15px;
+    font-size: 13px;
     font-weight: 500;
     color: #ffffff;
     white-space: nowrap;
@@ -2134,16 +2118,16 @@ const sharedStyles = `
 
   .index-meta {
     flex-shrink: 0;
-    font-size: 12px;
+    font-size: 11px;
     color: rgba(215, 222, 255, 0.65);
   }
 
   .guest-card {
-    border-radius: 22px;
+    border-radius: 18px;
     background:ze: 12px;
     color: rgba(215, 222, 255, 0.65);
     border: none;
-    padding: 8px 10px 0;
+    padding: 6px 6px 0;
     height: 100%;
     display: flex;
     flex-direction: column;
@@ -2152,24 +2136,24 @@ const sharedStyles = `
   .guest-eyebrow {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
-    margin-bottom: 14px;
+    gap: 7px;
+    margin-bottom: 12px;
     color: rgba(220, 228, 255, 0.82);
     letter-spacing: 0.18em;
-    font-size: 12px;
+    font-size: 11px;
     text-transform: uppercase;
   }
 
   .guest-title {
     margin: 0;
-    font-size: clamp(28px, 4vw, 46px);
+    font-size: clamp(24px, 3.4vw, 36px);
     line-height: 1.15;
     color: #f7f8ff;
   }
 
   .guest-subtitle {
-    margin: 8px 0 0;
-    font-size: clamp(20px, 2.8vw, 20px);
+    margin: 7px 0 0;
+    font-size: clamp(17px, 2.4vw, 18px);
     line-height: 1.15;
     font-weight: 700;
     letter-spacing: 0.04em;
@@ -2178,26 +2162,65 @@ const sharedStyles = `
   }
 
   .guest-text {
-    margin: 18px 0 0;
+    margin: 14px 0 0;
     max-width: 56rem;
-    line-height: 2;
+    line-height: 1.75;
     color: rgba(245,247,255,0.9);
-    font-size: 15px;
+    font-size: 13px;
   }
 
   .guest-actions {
-    margin-top: 28px;
+    margin-top: 20px;
     display: flex;
     flex-wrap: wrap;
-    gap: 12px;
+    gap: 10px;
+  }
+
+  .page-intro .guest-actions {
+    position: absolute;
+    top: 22px;
+    right: 26px;
+    margin: 0;
+    z-index: 5;
+  }
+
+  .page-intro .guest-button {
+    width: 44px;
+    height: 40px;
+    padding: 0;
+    border-radius: 999px;
+    border: 1px solid rgba(255,255,255,0.14);
+    background: rgba(255,255,255,0.08);
+    box-shadow: 0 10px 24px rgba(0,0,0,0.18);
+    color: #f5f7ff;
+    font-size: 20px;
+    line-height: 1;
+    letter-spacing: 0;
+    transition:
+      transform 0.2s ease,
+      background 0.2s ease,
+      border-color 0.2s ease,
+      box-shadow 0.2s ease,
+      filter 0.2s ease;
+  }
+
+  .page-intro .guest-button:hover {
+    transform: translateY(-1px);
+    filter: brightness(1.08);
+    background: rgba(255,255,255,0.18);
+    border-color: rgba(255,255,255,0.34);
+    box-shadow:
+      0 14px 28px rgba(0,0,0,0.22),
+      0 0 0 1px rgba(255,255,255,0.18) inset,
+      0 0 18px rgba(255,255,255,0.14);
   }
 
   .guest-button {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 10px;
-    padding: 12px 20px;
+    gap: 8px;
+    padding: 10px 16px;
     border-radius: 999px;
     border: 1px solid rgba(255,255,255,0.08);
     background: linear-gradient(135deg, #7f8cff, #97a8ff);
@@ -2212,8 +2235,8 @@ const sharedStyles = `
     display: flex;
     flex-direction: column;
     justify-content: center;
-    gap: 28px;
-    padding: 10px 4px 0;
+    gap: 14px;
+    padding: 0;
   }
 
   .chooser-header {
@@ -2223,47 +2246,47 @@ const sharedStyles = `
   .chooser-kicker {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
-    margin: 0 0 12px;
-    font-size: 12px;
-    letter-spacing: 0.22em;
+    gap: 7px;
+    margin: 0 0 10px;
+    font-size: 11px;
+    letter-spacing: 0.18em;
     text-transform: uppercase;
     color: rgba(220, 228, 255, 0.78);
   }
 
   .chooser-title {
     margin: 0;
-    font-size: clamp(28px, 4vw, 44px);
+    font-size: clamp(22px, 3vw, 30px);
     line-height: 1.1;
     color: #f7f8ff;
   }
 
   .chooser-text {
-    margin: 12px 0 0;
+    margin: 7px 0 0;
     max-width: 44rem;
-    font-size: 15px;
-    line-height: 1.9;
+    font-size: 13px;
+    line-height: 1.6;
     color: rgba(220, 228, 255, 0.78);
   }
 
   .chooser-grid {
     display: grid;
-    gap: 18px;
+    gap: 10px;
     grid-template-columns: minmax(0, 1fr);
-    padding-left: 22px;
+    padding-left: 12px;
   }
 
   .chooser-card {
     display: grid;
-    grid-template-columns: minmax(120px, 168px) minmax(0, 1fr);
+    grid-template-columns: minmax(86px, 112px) minmax(0, 1fr);
     align-items: center;
-    gap: 18px;
+    gap: 12px;
     width: 100%;
     text-align: left;
-    border-radius: 26px;
+    border-radius: 18px;
     border: 1px solid rgba(255,255,255,0.18);
     background: rgba(255,255,255,0.08);
-    padding: 18px;
+    padding: 11px 13px;
     color: #fff;
     box-shadow: 0 16px 40px rgba(0,0,0,0.18);
     cursor: pointer;
@@ -2580,26 +2603,26 @@ const sharedStyles = `
   .chooser-eyebrow {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
-    padding: 0 0 12px;
-    font-size: 12px;
+    gap: 7px;
+    padding: 0 0 8px;
+    font-size: 11px;
     font-weight: 700;
-    letter-spacing: 0.3em;
+    letter-spacing: 0.22em;
     text-transform: uppercase;
     color: rgba(240, 243, 255, 0.72);
   }
 
   .chooser-card h3 {
     margin: 0;
-    font-size: 24px;
+    font-size: 17px;
     line-height: 1.2;
     color: #ffffff;
   }
 
   .chooser-card p {
-    margin: 12px 0 0;
-    font-size: 14px;
-    line-height: 1.85;
+    margin: 6px 0 0;
+    font-size: 12px;
+    line-height: 1.55;
     color: rgba(226, 231, 255, 0.78);
   }
 
@@ -2612,19 +2635,19 @@ const sharedStyles = `
 
     .chooser-card {
       grid-template-columns: 1fr;
-      gap: 16px;
-      padding: 18px;
+      gap: 12px;
+      padding: 14px;
     }
 
     .tarot-index-page {
       grid-template-columns: 1fr;
       align-content: start;
       overflow-y: auto;
-      padding: 42px 8px 12px;
+      padding: 28px 6px 10px 18px;
     }
 
     .tarot-index-card {
-      min-height: 150px;
+      min-height: 132px;
     }
 
   }
@@ -2634,8 +2657,8 @@ const sharedStyles = `
     min-height: 0;
     display: flex;
     flex-direction: column;
-    gap: 12px;
-    padding-top: 10px;
+    gap: 10px;
+    padding-top: 4px;
   }
 
   .form-row {
@@ -2653,7 +2676,7 @@ const sharedStyles = `
 
   .form-row input {
     width: 100%;
-    padding: 12px 14px;
+    padding: 10px 14px;
     border: 1px solid rgba(255,255,255,0.08);
     border-radius: 12px;
     background: rgba(255,255,255,0.14);
@@ -2671,8 +2694,8 @@ const sharedStyles = `
     margin-top: auto;
     display: flex;
     justify-content: flex-end;
-    gap: 12px;
-    padding-top: 20px;
+    gap: 10px;
+    padding-top: 12px;
   }
 
   .form-actions button,
@@ -2730,9 +2753,9 @@ const sharedStyles = `
 
   .reading-body {
     white-space: pre-wrap;
-    line-height: 1.9;
-    font-size: 16px;
-    padding: 4px 6px 14px 18px;
+    line-height: 1.78;
+    font-size: 13px;
+    padding: 2px 6px 12px 18px;
     color: rgba(245,247,255,0.93);
     text-align: justify;
   }
@@ -2742,14 +2765,15 @@ const sharedStyles = `
     align-items: center;
     justify-content: center;
     width: 100%;
-    min-height: 100%;
-    padding: 4px 0 14px;
+    height: 100%;
+    min-height: 0;
+    padding: 0;
   }
 
   .chart-box img {
     display: block;
     max-width: 100%;
-    max-height: calc(100vh - 260px);
+    max-height: 100%;
     object-fit: contain;
     border-radius: 18px;
     box-shadow:
@@ -2757,30 +2781,11 @@ const sharedStyles = `
       0 0 0 1px rgba(255,255,255,0.06);
   }
 
-  .result-table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 4px;
-  }
-
-  .result-table th,
-  .result-table td {
-    border-bottom: 1px solid rgba(255,255,255,0.16);
-    padding: 10px;
-    text-align: center;
-    word-break: break-word;
-  }
-
-  .result-table th {
-    background: rgba(255,255,255,0.08);
-    font-weight: 500;
-  }
-
   .book-nav {
     position: absolute;
-    left: 44px;
+    left: 32px;
     right: 10px;
-    bottom: 24px;
+    bottom: 16px;
     display: flex;
     justify-content: space-between;
     gap: 12px;
@@ -2790,15 +2795,15 @@ const sharedStyles = `
 
   .book-nav button {
     pointer-events: auto;
-    width: 52px;
-    height: 46px;
-    padding: 0 18px;
+    width: 44px;
+    height: 40px;
+    padding: 0 14px;
     border-radius: 999px;
     border: 1px solid rgba(255,255,255,0.14);
     background: rgba(255,255,255,0.08);
     box-shadow: 0 10px 24px rgba(0,0,0,0.18);
     color: #f5f7ff;
-    font-size: 22px;
+    font-size: 18px;
   }
 
   .book-nav button:hover {
@@ -2828,37 +2833,76 @@ const sharedStyles = `
 
   .footer {
     text-align: center;
-    padding: 0 16px 18px;
+    padding: 0 16px 8px;
     color: #c3c7ff;
     opacity: 0.72;
-    font-size: 14px;
+    font-size: 11px;
+  }
+
+  .page-chart {
+    padding-top: 18px;
+    padding-bottom: 54px;
+  }
+
+  .page-chart .reading-title {
+    margin-bottom: 8px;
+    font-size: 18px;
+  }
+
+  .page-chart .reading-body {
+    padding: 0 0 8px 12px;
+  }
+
+  .page-chooser {
+    padding-top: 20px;
+  }
+
+  .page-public-index,
+  .page-private-index,
+  .page-form,
+  .page-geo,
+  .page-helio {
+    padding-top: 20px;
+  }
+
+  .page-public-index .reading-subtitle,
+  .page-private-index .reading-subtitle,
+  .page-geo .reading-subtitle,
+  .page-helio .reading-subtitle {
+    margin-bottom: 10px;
+  }
+
+  .page-geo .reading-body,
+  .page-helio .reading-body {
+    padding-left: 12px;
   }
 
   @media (max-width: 760px) {
     .book-shell {
-      width: calc(100vw - 18px);
-      height: calc(100vh - 86px);
-      height: calc(100dvh - 86px);
-      margin: 10px auto 18px;
+      width: min(calc(100vw - 24px), calc((100dvh - 42px) * 0.78));
+      height: calc(100vh - 42px);
+      height: calc(100dvh - 42px);
+      min-height: min(620px, calc(100dvh - 42px));
+      margin: 10px auto 12px;
     }
 
     .page {
-      padding: 22px 16px 76px 26px;
+      padding: 20px 14px 68px 24px;
       margin-left: 0;
     }
 
     .chooser-page {
       justify-content: center;
-      gap: 12px;
+      gap: 10px;
       padding: 0;
     }
 
     .chooser-card {
-      grid-template-columns: minmax(76px, 92px) minmax(0, 1fr);
-      gap: 12px;
-      min-height: 122px;
-      padding: 12px;
-      border-radius: 18px;
+      grid-template-columns: minmax(64px, 76px) minmax(0, 1fr);
+      gap: 10px;
+      min-height: 104px;
+      padding: 10px;
+      border-radius: 16px;
     }
 
     .chooser-media-frame {
@@ -2866,7 +2910,7 @@ const sharedStyles = `
     }
 
     .chooser-card h3 {
-      font-size: 16px;
+      font-size: 14px;
       line-height: 1.22;
     }
 
@@ -2881,23 +2925,23 @@ const sharedStyles = `
     }
 
     .tarot-index-page {
-      gap: 12px;
-      padding: 8px 2px 4px;
+      gap: 10px;
+      padding: 6px 2px 4px 14px;
     }
 
     .tarot-index-card {
-      min-height: 190px;
-      padding: 14px;
+      min-height: 150px;
+      padding: 12px;
     }
 
     .tarot-index-art {
-      width: min(200px, 58vw);
+      width: min(170px, 54vw);
     }
 
     .book-tarot-reading-content,
     .book-tarot-result-content {
-      margin: -6px -10px -36px -18px;
-      padding: 4px 8px 70px 24px;
+      margin: -6px -8px -34px -16px;
+      padding: 4px 7px 64px 22px;
     }
 
     .book-tarot-reading-content section,
@@ -2945,7 +2989,7 @@ const sharedStyles = `
 
     .reading-title {
       margin-bottom: 8px;
-      font-size: 18px;
+      font-size: 16px;
     }
 
     .reading-subtitle {
@@ -2959,15 +3003,15 @@ const sharedStyles = `
     }
 
     .book-nav {
-      left: 22px;
+      left: 20px;
       right: 8px;
-      bottom: 10px;
+      bottom: 9px;
     }
 
     .book-nav button {
-      width: 46px;
-      height: 40px;
-      font-size: 19px;
+      width: 40px;
+      height: 36px;
+      font-size: 17px;
     }
 
     .chart-box img {
