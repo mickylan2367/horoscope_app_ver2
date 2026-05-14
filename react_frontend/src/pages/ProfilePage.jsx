@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import Layout from "../components/Layout";
 import { apiFetch } from "../api";
 
-export default function ProfilePage({ user, onAuth }) {
+export default function ProfilePage({ user, onAuth, onLogout }) {
   const [username, setUsername] = useState(user?.username ?? "");
   const [email, setEmail] = useState(user?.email ?? "");
   const [message, setMessage] = useState("");
@@ -35,7 +35,7 @@ export default function ProfilePage({ user, onAuth }) {
   };
 
   return (
-    <Layout user={user}>
+    <Layout user={user} onLogout={onLogout}>
       <form onSubmit={handleSubmit} className="mx-auto max-w-2xl rounded-2xl bg-white p-8 shadow-sm">
         <h1 className="mb-6 text-3xl font-bold text-[#5c3a3a]">PROFILE</h1>
         {message ? <p className="mb-4 text-sm text-[#5c7d3a]">{message}</p> : null}

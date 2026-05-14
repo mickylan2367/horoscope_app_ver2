@@ -12,11 +12,8 @@ class HoroscopeResult(models.Model):
     cache_key = models.CharField(max_length=255)
     result_json = models.JSONField(default=dict)
     created_at = models.DateTimeField(auto_now_add=True)
-    # "geo": result_geo,
-    # "helio": result_helio,
-    # "ai_text_geo": ai_text_geo,
-    # "ai_text_helio":ai_text_helio,
-    # "chart_url": chart_geo_url,
+    # result_json keeps internal chart data for AI generation, chart rendering,
+    # and cache reuse. The React API does not expose raw geo/helio table rows.
 
     class Meta:
         constraints = [

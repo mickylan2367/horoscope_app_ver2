@@ -1,4 +1,4 @@
-{% extends 'chart/base.html' %}
+﻿{% extends 'chart/base.html' %}
 
 {% block content %}
 <div class="book-shell">
@@ -35,7 +35,7 @@
     </section>
 
     <section class="page hidden">
-      <h2 class="reading-title">✨ STAR TITLE ✨</h2>
+      <h2 class="reading-title">笨ｨ STAR TITLE 笨ｨ</h2>
       <form method="post" novalidate>
         {% csrf_token %}
 
@@ -97,65 +97,13 @@
     </section>
     {% endif %}
 
-    {% if result_geo %}
-    {% if result_geo.error %}
+    {% if result_geo and result_geo.error %}
     <p style="color:red;">{{ result_geo.error }}</p>
-    {% else %}
-    <section class="page hidden">
-      <h2 class="reading-title">GEOCENTRIC</h2>
-      <div class="reading-body">
-        <table class="result-table">
-          <tr>
-            <th>天体</th>
-            <th>Meaning</th>
-            <th>サイン</th>
-            <th>年齢</th>
-            <th>サビアンシンボル</th>
-          </tr>
-          {% for row in result_geo %}
-          <tr>
-            <td>{{ row.0 }}</td>
-            <td>{{ row.6 }}</td>
-            <td>{{ row.1 }} {{ row.2}}°</td>
-            <td>{{ row.5 }}</td>
-            <td>{{ row.4 }}</td>
-          </tr>
-          {% endfor %}
-        </table>
-      </div>
-    </section>
-    {% endif %}
-    {% endif %}
-
-    {% if result_helio %}
-    <section class="page hidden">
-      <h2 class="reading-title">HELIOCENTRIC</h2>
-      <div class="reading-body">
-        <table class="result-table">
-          <tr>
-            <th>天体</th>
-            <th>意味</th>
-            <th>星座</th>
-            <th>度数</th>
-            <th>サビアン</th>
-          </tr>
-          {% for row in result_helio %}
-          <tr>
-            <td>{{ row.0 }}</td>
-            <td>{{ row.4 }}</td>
-            <td>{{ row.1 }}</td>
-            <td>{{ row.2 }}°</td>
-            <td>{{ row.3 }}</td>
-          </tr>
-          {% endfor %}
-        </table>
-      </div>
-    </section>
     {% endif %}
 
     <div class="book-nav">
-      <button type="button" id="prevPage" aria-label="前のページ">←</button>
-      <button type="button" id="nextPage" aria-label="次のページ">→</button>
+      <button type="button" id="prevPage" aria-label="蜑阪・繝壹・繧ｸ">竊・/button>
+      <button type="button" id="nextPage" aria-label="谺｡縺ｮ繝壹・繧ｸ">竊・/button>
     </div>
   </div>
 </div>
@@ -165,7 +113,7 @@
 <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
 <script>
   document.addEventListener("DOMContentLoaded", function () {
-    // 位置検索
+    // 菴咲ｽｮ讀懃ｴ｢
     const placeInput = document.getElementById("id_place");
     const latInput = document.getElementById("id_lat");
     const lonInput = document.getElementById("id_lon");
@@ -201,32 +149,32 @@
         if (!q || q === lastQuery) return;
         lastQuery = q;
 
-        status.textContent = "（位置検索中…）";
+        status.textContent = "・井ｽ咲ｽｮ讀懃ｴ｢荳ｭ窶ｦ・・;
 
         try {
           const hit = await geocode(q);
 
           if (!hit) {
-            status.textContent = "（見つかりません。別の表記で）";
+            status.textContent = "・郁ｦ九▽縺九ｊ縺ｾ縺帙ｓ縲ょ挨縺ｮ陦ｨ險倥〒・・;
             return;
           }
 
           latInput.value = hit.lat;
           lonInput.value = hit.lon;
           status.textContent =
-            `（OK: ${Number(hit.lat).toFixed(5)}, ${Number(hit.lon).toFixed(5)}）`;
+            `・・K: ${Number(hit.lat).toFixed(5)}, ${Number(hit.lon).toFixed(5)}・荏;
         } catch (e) {
-          status.textContent = "（検索失敗）";
+          status.textContent = "・域､懃ｴ｢螟ｱ謨暦ｼ・;
         }
       });
     }
 
-    // ページめくり
+    // 繝壹・繧ｸ繧√￥繧・
     const pages = document.querySelectorAll(".book .page");
     const prevBtn = document.getElementById("prevPage");
     const nextBtn = document.getElementById("nextPage");
 
-    let currentPage = {% if ai_text_geo or ai_text_helio or chart_geo_url or result_geo or result_helio %}1{% else %}0{% endif %};
+    let currentPage = {% if ai_text_geo or ai_text_helio or chart_geo_url %}1{% else %}0{% endif %};
 
   function showPage(index) {
     pages.forEach((page, i) => {

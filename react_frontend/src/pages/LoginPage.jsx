@@ -28,11 +28,11 @@ export default function LoginPage({ onAuth }) {
     <Layout user={null} headerVariant="cosmic" hideAuthActions>
       <form
         onSubmit={handleSubmit}
-        className="mx-auto max-w-md rounded-[2rem] border border-white/12 bg-[#1a1530]/58 p-8 text-white shadow-[0_18px_70px_rgba(0,0,0,0.32)] backdrop-blur-2xl"
+        className="home-content-scale mx-auto max-w-md rounded-[2rem] border border-white/12 bg-[#1a1530]/58 p-8 text-white shadow-[0_18px_70px_rgba(0,0,0,0.32)] backdrop-blur-2xl"
       >
         <h1 className="mb-3 text-3xl font-bold tracking-[0.08em] text-[#f4eeff]">LOGIN</h1>
         <p className="mb-6 text-sm leading-7 text-slate-300">
-          Sign in to open your chart and keep your records in one place.
+          Sign in with your LovelyWitch Life account to keep your charts and records in one place.
         </p>
         {error ? <p className="mb-4 rounded-2xl border border-rose-400/20 bg-rose-400/10 px-4 py-3 text-sm text-rose-200">{error}</p> : null}
         <label className="mb-2 block text-sm font-medium text-slate-200">Username</label>
@@ -63,13 +63,13 @@ export default function LoginPage({ onAuth }) {
 
         <button
           type="button"
-          disabled
-          className="flex w-full cursor-not-allowed items-center justify-center gap-2 rounded-full border border-white/12 bg-white/8 px-6 py-3.5 text-base font-medium text-slate-200 opacity-85"
+          onClick={() => navigate("/chart/warp", { state: { source: "skip-auth" } })}
+          className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-full border border-white/12 bg-white/8 px-6 py-3.5 text-base font-medium text-slate-200 transition hover:-translate-y-0.5 hover:border-white/20 hover:bg-white/12 hover:text-white active:translate-y-0"
         >
-          Continue with Google
+          Set up later
         </button>
         <p className="mt-3 text-center text-xs text-slate-400">
-          Google login will be added here.
+          You can create an account or sign in later.
         </p>
 
         <p className="mt-5 text-center text-sm text-slate-300">

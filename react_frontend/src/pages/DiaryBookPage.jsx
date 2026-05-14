@@ -393,6 +393,24 @@ export function DiaryBookContent({
     goToEditor(`/diary/${entry.id}/edit`, entry.id);
   }, [embedded, goToEditor, navigate, onOpenTarotReading]);
 
+  const handleDeleteEntry = useCallback(async (entry) => {
+    const confirmed = window.confirm("本当に消していいですか？関連するデータも削除されます。");
+    if (!confirmed) return;
+
+    try {
+      if (entry.sourceType === "tarot") {
+        await apiFetch(`/api/tarot/readings/${entry.tarotReadingId}/`, { method: "DELETE" });
+      } else {
+        await apiFetch(`/api/diaries/${entry.id}/`, { method: "DELETE" });
+      }
+
+      setDiaries((current) => current.filter((diary) => diary.id !== entry.id));
+      setNotice(entry.sourceType === "tarot" ? "Tarot record deleted." : "Diary deleted.");
+    } catch (err) {
+      setError(err.message || "Failed to delete entry.");
+    }
+  }, []);
+
   const showMoreDiaries = useCallback(() => {
     setVisibleDiaryCount((current) => Math.max(current, visibleDiaryLimit) + DIARY_PAGE_SIZE);
   }, [visibleDiaryLimit]);
@@ -503,6 +521,7 @@ export function DiaryBookContent({
                                 }
                                 deferImages={!listImagesReady}
                                 onOpenEdit={handleCardOpen}
+                                onDelete={handleDeleteEntry}
                               />
                             ))
                           : null}
@@ -684,15 +703,15 @@ export function DiaryBookContent({
         }
 
         .diary-book-shell-embedded .diary-page-list .diary-page-inner {
-          padding: 18px 20px 58px 22px;
+          padding: 18px 20px 58px 44px;
         }
 
         .diary-book-shell-embedded .diary-page-calendar .diary-page-inner {
-          padding: 18px 20px 58px 22px;
+          padding: 18px 20px 58px 44px;
         }
 
         .diary-book-shell-embedded .diary-page-editor .diary-page-inner {
-          padding: 18px 20px 58px 22px;
+          padding: 18px 20px 58px 44px;
         }
 
         .diary-book-shell-embedded .diary-page-topbar {
@@ -1018,6 +1037,12 @@ export function DiaryBookContent({
           .diary-book-shell-embedded .diary-page-calendar .diary-page-inner,
           .diary-book-shell-embedded .diary-page-editor .diary-page-inner {
             padding: 14px 12px 66px 14px;
+          }
+
+          .diary-book-shell-embedded .diary-page-list .diary-page-inner,
+          .diary-book-shell-embedded .diary-page-calendar .diary-page-inner,
+          .diary-book-shell-embedded .diary-page-editor .diary-page-inner {
+            padding-left: 30px;
           }
 
           .diary-book-shell-embedded .diary-page-nav {

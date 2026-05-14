@@ -205,12 +205,14 @@ class TarotApiTests(TestCase):
                     "description": "Personal symbols",
                     "deckType": "oracle",
                     "allowReversed": False,
+                    "isPublic": True,
                 }
             ),
             content_type="application/json",
         )
 
         self.assertEqual(create_response.status_code, 201)
+        self.assertFalse(create_response.json()["isPublic"])
         deck_id = create_response.json()["id"]
 
         update_response = self.client.put(
@@ -221,6 +223,7 @@ class TarotApiTests(TestCase):
                     "description": "Updated",
                     "deckType": "oracle",
                     "allowReversed": False,
+                    "isPublic": True,
                 }
             ),
             content_type="application/json",
@@ -228,6 +231,7 @@ class TarotApiTests(TestCase):
 
         self.assertEqual(update_response.status_code, 200)
         self.assertEqual(update_response.json()["name"], "My Oracle Edited")
+        self.assertFalse(update_response.json()["isPublic"])
 
         delete_response = self.client.delete(reverse("api_tarot_deck_detail", args=[deck_id]))
 

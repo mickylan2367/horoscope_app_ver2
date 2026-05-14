@@ -933,8 +933,6 @@ def _calculate_chart(data, user, include_ai=False, save_profile=False):
             "lat": lat,
             "lon": lon,
         },
-        "resultGeo": result_json.get("geo"),
-        "resultHelio": result_json.get("helio"),
         "aiTextGeo": result_json.get("ai_text_geo"),
         "aiTextHelio": result_json.get("ai_text_helio"),
         "chartGeoUrl": result_json.get("chart_url"),
@@ -1297,7 +1295,7 @@ def api_tarot_decks(request):
         description=str(data.get("description", "")),
         cover_image_url=str(data.get("coverImage", data.get("cover_image", "")) or ""),
         deck_type=deck_type,
-        is_public=_coerce_bool(data.get("isPublic", data.get("is_public")), False),
+        is_public=False,
         allow_reversed=_coerce_bool(data.get("allowReversed", data.get("allow_reversed")), deck_type == TarotDeck.DECK_TYPE_TAROT),
     )
     if request.FILES.get("coverImageFile"):
@@ -1343,7 +1341,7 @@ def api_tarot_deck_detail(request, pk):
     if deck_type not in {TarotDeck.DECK_TYPE_TAROT, TarotDeck.DECK_TYPE_ORACLE}:
         return JsonResponse({"error": "deckType must be tarot or oracle"}, status=400)
     deck.deck_type = deck_type
-    deck.is_public = _coerce_bool(data.get("isPublic", data.get("is_public")), deck.is_public)
+    deck.is_public = False
     deck.allow_reversed = _coerce_bool(data.get("allowReversed", data.get("allow_reversed")), deck.allow_reversed)
     if request.FILES.get("coverImageFile"):
         deck.cover_image = request.FILES["coverImageFile"]

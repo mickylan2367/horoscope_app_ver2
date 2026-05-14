@@ -23,6 +23,7 @@ export default function Layout({
   hideAuthActions = false,
   hideHeader = false,
   hideBackground = false,
+  onLogout,
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -31,9 +32,10 @@ export default function Layout({
 
   const handleLogout = async () => {
     await apiFetch("/api/auth/logout/", { method: "POST", body: "{}" });
+    onLogout?.();
     setProfileOpen(false);
     setMenuOpen(false);
-    navigate("/diary/warp", { state: { target: "/thank-you", reloadAfter: true, warpMode: "collapse" } });
+    navigate("/diary/warp", { state: { target: "/thank-you", warpMode: "collapse" } });
   };
 
   useEffect(() => {
