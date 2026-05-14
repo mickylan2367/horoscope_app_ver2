@@ -4,6 +4,12 @@
   zoom: 0.8;
 }
 
+@media (max-width: 760px) {
+  .home-content-scale {
+    zoom: 1;
+  }
+}
+
 .diary-snippet {
   display: -webkit-box;
   -webkit-box-orient: vertical;

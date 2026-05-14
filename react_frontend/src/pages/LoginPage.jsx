@@ -28,7 +28,7 @@ export default function LoginPage({ onAuth }) {
     <Layout user={null} headerVariant="cosmic" hideAuthActions>
       <form
         onSubmit={handleSubmit}
-        className="mx-auto max-w-md rounded-[2rem] border border-white/12 bg-[#1a1530]/58 p-8 text-white shadow-[0_18px_70px_rgba(0,0,0,0.32)] backdrop-blur-2xl"
+        className="home-content-scale mx-auto max-w-md rounded-[2rem] border border-white/12 bg-[#1a1530]/58 p-8 text-white shadow-[0_18px_70px_rgba(0,0,0,0.32)] backdrop-blur-2xl"
       >
         <h1 className="mb-3 text-3xl font-bold tracking-[0.08em] text-[#f4eeff]">LOGIN</h1>
         <p className="mb-6 text-sm leading-7 text-slate-300">
