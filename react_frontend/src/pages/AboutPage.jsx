@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { motion as Motion } from "framer-motion";
 import { ExternalLink, Sparkles } from "lucide-react";
-import logo2 from "../assets/logo2.jpg";
+import me from "../assets/me.jpg";
 
 const career = [
   {
@@ -11,13 +11,13 @@ const career = [
   },
   {
     year: "2023~",
-    en: "Focused more on front-end work and user-facing design.",
-    ja: "フロントエンド制作と、使う人に届くデザインをより意識するようになりました。",
+    en: "Found AI and applied math very interesting, and started to learn them.",
+    ja: "AIと応用数学に興味を持ち、学び始めました。",
   },
   {
     year: "Now",
     en: "Building Daily Witchcrafts as one connected world.",
-    ja: "Daily Witchcrafts を、ひとつのつながった世界として育てています。",
+    ja: "Daily Witchcrafts を誰もが安心して占いができる世界へ育てています。",
   },
 ];
 
@@ -59,57 +59,57 @@ export default function AboutPage() {
     <div className="relative isolate min-h-screen bg-[#070b17] text-white">
       <Background />
 
-      <main className="relative z-10 mx-auto max-w-6xl px-6 py-10 md:px-10 md:py-12">
+      <main className="relative z-10 mx-auto max-w-6xl px-4 py-5 sm:px-6 md:px-8 md:py-7">
         <div className="flex items-center justify-between">
           <Link
             to="/"
-            className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-4 py-2 text-sm text-white transition hover:bg-white/10"
+            className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-xs text-white transition hover:bg-white/10"
           >
             Back to Home
           </Link>
         </div>
 
-        <section className="mt-8 overflow-hidden rounded-[2rem] border border-white/10 bg-white/5 p-6 shadow-2xl backdrop-blur-md md:p-10">
-          <div className="mx-auto max-w-4xl">
-            <h1 className="text-sm font-medium uppercase tracking-[0.32em] text-fuchsia-100/80 md:text-base">
+        <section className="mt-4 overflow-hidden rounded-3xl border border-white/10 bg-white/5 p-4 shadow-2xl backdrop-blur-md sm:p-5 md:p-6">
+          <div className="mx-auto max-w-5xl">
+            <h1 className="text-xs font-medium uppercase tracking-[0.28em] text-fuchsia-100/80 md:text-sm">
               profile & contact
             </h1>
 
-            <p className="mt-5 max-w-3xl text-base leading-8 text-slate-200">
+            <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-200">
               If you have any questions or would like to get in touch, please e-mail me at <a href="mailto:mickylan2367@gmail.com" className="text-fuchsia-400 hover:underline">
                 mickylan2367@gmail.com
               </a>
             </p>
 
-            <div className="mt-10 grid items-center gap-6 rounded-[2rem] border border-white/10 bg-black/10 p-6 shadow-xl backdrop-blur-md md:grid-cols-[180px_1fr] md:p-8">
+            <div className="mt-5 grid items-stretch gap-4 rounded-2xl border border-white/10 bg-black/10 p-4 shadow-xl backdrop-blur-md md:grid-cols-[128px_1fr] md:p-5">
               <Motion.div
-                animate={{ scale: [1, 1.05, 1] }}
-                transition={{ repeat: Infinity, duration: 2 }}
-                className="h-28 w-28 rounded-full p-[3px] bg-gradient-to-br from-fuchsia-400 to-indigo-400 shadow-[0_0_20px_rgba(168,85,247,0.6)]"
+                animate={{ y: [0, -3, 0] }}
+                transition={{ repeat: Infinity, duration: 3.2, ease: "easeInOut" }}
+                className="mx-auto h-36 w-full max-w-44 overflow-hidden rounded-2xl border border-white/15 bg-gradient-to-br from-fuchsia-400/40 to-indigo-400/30 p-[3px] shadow-[0_0_20px_rgba(168,85,247,0.35)] md:h-auto md:min-h-full md:max-w-none"
               >
                 <img
-                  src={logo2}
+                  src={me}
                   alt="profile"
-                  className="h-full w-full rounded-full object-cover"
+                  className="h-full w-full rounded-[0.85rem] object-cover"
                 />
               </Motion.div>
 
               <div>
-                <h2 className="text-xl font-semibold text-white md:text-2xl">MICKYLAN</h2>
+                <h2 className="text-lg font-semibold text-white md:text-xl">MICKYLAN</h2>
 
-                <div className="mt-4 space-y-5 text-base leading-8 text-slate-200">
+                <div className="mt-3 space-y-3 text-sm leading-6 text-slate-200">
                   <div>
                     <p>
                       I love anime and reading, and I am especially passionate about Western astrology.
                     </p>
-                    <p className="mt-1 text-base leading-8 text-fuchsia-100/80">
+                    <p className="mt-1 text-sm leading-6 text-fuchsia-100/80">
                       アニメと読書、そして特に西洋占星術が大好き。
                     </p>
                   </div>
 
                   <div>
                     <p>I am still learning tarot, so I have a long way to go.</p>
-                    <p className="mt-1 text-base leading-8 text-fuchsia-100/80">
+                    <p className="mt-1 text-sm leading-6 text-fuchsia-100/80">
                       タロットはまだ勉強中です。
                     </p>
                   </div>
@@ -119,18 +119,18 @@ export default function AboutPage() {
                       Even though AI, science, and astrology may seem different, I find it
                       fascinating that they all try to understand the future in their own way.
                     </p>
-                    <p className="mt-1 text-base leading-8 text-fuchsia-100/80">
+                    <p className="mt-1 text-sm leading-6 text-fuchsia-100/80">
                       AI、科学、占星術は一見ちがうものに見えますが、それぞれの方法で未来を理解しようとしているところがとても面白いとおもい制作しました。
                     </p>
                   </div>
                 </div>
 
-                <div className="mt-6 flex flex-wrap gap-3">
+                <div className="mt-4 flex flex-wrap gap-2">
                   <a
                     href="https://github.com/mickylan2367"
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-4 py-2 text-sm text-white transition hover:bg-white/10"
+                    className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-xs text-white transition hover:bg-white/10"
                   >
                     <ExternalLink className="h-4 w-4" />
                     GitHub
@@ -139,7 +139,7 @@ export default function AboutPage() {
                     href="https://qiita.com/mitzukan"
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-4 py-2 text-sm text-white transition hover:bg-white/10"
+                    className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-xs text-white transition hover:bg-white/10"
                   >
                     <Sparkles className="h-4 w-4" />
                     Qiita
@@ -148,12 +148,12 @@ export default function AboutPage() {
               </div>
             </div>
 
-            <div className="mt-10 rounded-[2rem] border border-white/10 bg-white/5 p-6 shadow-xl backdrop-blur-md">
-              <div className="inline-flex items-center gap-2 text-sm tracking-[0.22em] uppercase text-fuchsia-200/80">
+            <div className="mt-5 rounded-2xl border border-white/10 bg-white/5 p-4 shadow-xl backdrop-blur-md md:p-5">
+              <div className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.22em] text-fuchsia-200/80">
                 <span>Motto</span>
               </div>
-              <h2 className="mt-4 text-2xl font-semibold text-white">THE SERENITY PRAYER</h2>
-              <div className="mt-4 space-y-4 text-base leading-8 text-slate-200">
+              <h2 className="mt-2 text-lg font-semibold text-white md:text-xl">THE SERENITY PRAYER</h2>
+              <div className="mt-3 space-y-3 text-sm leading-6 text-slate-200">
                 <p>
                   O God, give me the serenity to accept what cannot be changed,
                   <br />
@@ -172,18 +172,18 @@ export default function AboutPage() {
               </div>
             </div>
 
-            <div className="mt-10 rounded-3xl border border-white/10 bg-black/10 p-6 shadow-xl backdrop-blur-md">
+            <div className="mt-5 rounded-2xl border border-white/10 bg-black/10 p-4 shadow-xl backdrop-blur-md md:p-5">
               <p className="text-xs uppercase tracking-[0.28em] text-fuchsia-200/70">
                 Career
               </p>
-              <div className="mt-3 space-y-3">
+              <div className="mt-3 grid gap-3 md:grid-cols-3">
                 {career.map((item) => (
-                  <div key={item.year} className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                  <div key={item.year} className="rounded-xl border border-white/10 bg-white/5 p-3">
                     <p className="text-xs uppercase tracking-[0.28em] text-fuchsia-200/70">
                       {item.year}
                     </p>
-                    <p className="mt-2 text-base leading-8 text-slate-200">{item.en}</p>
-                    <p className="mt-1 text-base leading-8 text-fuchsia-100/80">{item.ja}</p>
+                    <p className="mt-2 text-sm leading-6 text-slate-200">{item.en}</p>
+                    <p className="mt-1 text-sm leading-6 text-fuchsia-100/80">{item.ja}</p>
                   </div>
                 ))}
               </div>
