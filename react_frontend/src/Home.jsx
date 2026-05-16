@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { useEffect } from "react";
 import * as FullpageModule from "@fullpage/react-fullpage";
 import { motion as Motion, AnimatePresence } from "framer-motion";
+import AppHeader from "./components/AppHeader";
 import CosmicBackground from "./components/CosmicBackground";
 import {
   Star,
@@ -373,13 +374,7 @@ export default function Home() {
     <div className="relative isolate bg-[#070b17] text-white">
       <CosmicBackground variant="hero" />
       <div className="relative z-10">
-        <header className="fixed inset-x-0 top-0 z-30 border-b border-white/10 bg-gradient-to-r from-[#1a1026]/18 via-[#2a1530]/14 to-[#1a1026]/18 backdrop-blur-2xl">
-          <div className="home-content-scale mx-auto flex max-w-6xl items-center justify-between px-6 py-3.5 md:px-10">
-            <Link to="/" className="text-base font-semibold tracking-[0.22em] text-white md:text-lg">
-              Daily Witchcrafts
-            </Link>
-          </div>
-        </header>
+        <AppHeader variant="cosmic" />
         <ReactFullpage
           key={splitExperience ? "split-experience" : "single-experience"}
           licenseKey={"gplv3-license"}

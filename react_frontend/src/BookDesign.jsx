@@ -30,6 +30,142 @@ const sortGroupedEntries = (groups) =>
     return left.localeCompare(right);
   });
 
+function StarBookIntroPage({ onExit }) {
+  return (
+    <div className="guest-card">
+      <div className="guest-eyebrow">
+        <Sparkles className="h-4 w-4" />
+        <span>あなたの星の物語を、ひとつずつ開いていく。</span>
+      </div>
+      <h2 className="guest-subtitle">Horoscope & Sabian Symbol Reading</h2>
+      <p className="guest-text">
+        <br />
+        最初のページでは、ここで何が見えるのかをやさしく案内します。
+        <br />
+        On the first page, we gently guide you through what you can discover here.
+        <br />
+        その先には、誰でものぞける無料の Akashic Index。
+        <br />
+        Beyond that, you can explore the free Akashic Index that anyone can browse.
+        <br />
+        <br />
+        <br />
+        有名人の星の並びや、運命の輪の気配を、ページをめくるように楽しめます。
+        <br />
+        You can enjoy celebrity charts and the subtle hints of fate as if turning the pages of a storybook.
+        <br />
+        ログインすると、あなた自身の記録が加わり、保存したホロスコープや新しい星の読み解きを続けて開けます。
+        <br />
+        When you sign in, your own records appear, along with saved horoscopes and new readings that continue your journey through the stars.
+      </p>
+      <div className="guest-actions">
+        <button
+          type="button"
+          className="guest-button"
+          onClick={onExit}
+          aria-label="Exit"
+        >
+          ×
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function ChooserMedia({ type }) {
+  if (type === "chart") {
+    return (
+      <div className="chooser-media-frame chooser-media-chart">
+        <div className="chooser-media-glow" />
+        <div className="chooser-illustration chart-illustration">
+          <span className="chart-orbit chart-orbit-outer" />
+          <span className="chart-orbit chart-orbit-inner" />
+          <span className="chart-dot chart-dot-one" />
+          <span className="chart-dot chart-dot-two" />
+          <span className="chart-dot chart-dot-three" />
+        </div>
+      </div>
+    );
+  }
+
+  if (type === "diary") {
+    return (
+      <div className="chooser-media-frame chooser-media-diary">
+        <div className="chooser-media-glow" />
+        <div className="chooser-illustration diary-illustration">
+          <span className="diary-book" />
+          <span className="diary-ribbon" />
+          <span className="diary-line diary-line-one" />
+          <span className="diary-line diary-line-two" />
+          <span className="diary-heart" />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="chooser-media-frame chooser-media-tarot">
+      <div className="chooser-media-glow" />
+      <div className="chooser-illustration tarot-illustration">
+        <span className="tarot-card tarot-card-back" />
+        <span className="tarot-card tarot-card-front" />
+        <span className="tarot-moon" />
+        <span className="tarot-star tarot-star-one" />
+        <span className="tarot-star tarot-star-two" />
+      </div>
+    </div>
+  );
+}
+
+function ChooserCard({ type, eyebrow, title, text, onClick }) {
+  return (
+    <button
+      type="button"
+      className="chooser-card"
+      onClick={onClick}
+    >
+      <div className="chooser-media" aria-hidden="true">
+        <ChooserMedia type={type} />
+      </div>
+      <div className="chooser-copy">
+        <div className="chooser-eyebrow">{eyebrow}</div>
+        <h3>{title}</h3>
+        <p>{text}</p>
+      </div>
+    </button>
+  );
+}
+
+function BookChooserPage({ onOpenAkashicIndex, onOpenDiaryBook, onOpenTarotIndex }) {
+  return (
+    <div className="chooser-page">
+      <div className="chooser-grid">
+        <ChooserCard
+          type="chart"
+          eyebrow="Chart"
+          title="Open Akashic Index"
+          text="Open the current chart app pages and the shared free index."
+          onClick={onOpenAkashicIndex}
+        />
+        <ChooserCard
+          type="diary"
+          eyebrow="Diary"
+          title="Open Diary Book"
+          text="Move into the diary book with the calendar, list, and edit pages."
+          onClick={onOpenDiaryBook}
+        />
+        <ChooserCard
+          type="tarot"
+          eyebrow="Tarot"
+          title="Open Tarot Room"
+          text="Enter the tarot app to draw cards, browse decks."
+          onClick={onOpenTarotIndex}
+        />
+      </div>
+    </div>
+  );
+}
+
 export default function BookDesign({ user, onLogout }) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -304,132 +440,18 @@ export default function BookDesign({ user, onLogout }) {
       {
         key: "intro",
         title: "Welcome to your Star Book",
-        content: (
-          <div className="guest-card">
-            <div className="guest-eyebrow">
-              <Sparkles className="h-4 w-4" />
-              <span>あなたの星の物語を、ひとつずつ開いていく。</span>
-            </div>
-            <h2 className="guest-subtitle">Horoscope & Sabian Symbol Reading</h2>
-            <p className="guest-text">
-              <br />
-              最初のページでは、ここで何が見えるのかをやさしく案内します。
-              <br />
-              On the first page, we gently guide you through what you can discover here.
-              <br />
-              その先には、誰でものぞける無料の Akashic Index。
-              <br />
-              Beyond that, you can explore the free Akashic Index that anyone can browse.
-              <br />
-              <br />
-              <br />
-              有名人の星の並びや、運命の輪の気配を、ページをめくるように楽しめます。
-              <br />
-              You can enjoy celebrity charts and the subtle hints of fate as if turning the pages of a storybook.
-              <br />
-              ログインすると、あなた自身の記録が加わり、保存したホロスコープや新しい星の読み解きを続けて開けます。
-              <br />
-              When you sign in, your own records appear, along with saved horoscopes and new readings that continue your journey through the stars.
-            </p>
-            <div className="guest-actions">
-              <button
-                type="button"
-                className="guest-button"
-                onClick={closeAndLogout}
-                aria-label="Exit"
-              >
-                ×
-              </button>
-            </div>
-          </div>
-        ),
+        content: <StarBookIntroPage onExit={closeAndLogout} />,
       },
       {
         key: "chooser",
         title: "INDEX",
         subtitle: "select page",
         content: (
-          <div className="chooser-page">
-            <div className="chooser-grid">
-              <button
-                type="button"
-                className="chooser-card"
-                onClick={openAkashicIndex}
-              >
-                <div className="chooser-media" aria-hidden="true">
-                  <div className="chooser-media-frame chooser-media-chart">
-                    <div className="chooser-media-glow" />
-                    <div className="chooser-illustration chart-illustration">
-                      <span className="chart-orbit chart-orbit-outer" />
-                      <span className="chart-orbit chart-orbit-inner" />
-                      <span className="chart-dot chart-dot-one" />
-                      <span className="chart-dot chart-dot-two" />
-                      <span className="chart-dot chart-dot-three" />
-                    </div>
-                  </div>
-                </div>
-                <div className="chooser-copy">
-                  <div className="chooser-eyebrow">Chart</div>
-                  <h3>Open Akashic Index</h3>
-                  <p>
-                    Open the current chart app pages and the shared free index.
-                  </p>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                className="chooser-card"
-                onClick={openDiaryBook}
-              >
-                <div className="chooser-media" aria-hidden="true">
-                  <div className="chooser-media-frame chooser-media-diary">
-                    <div className="chooser-media-glow" />
-                    <div className="chooser-illustration diary-illustration">
-                      <span className="diary-book" />
-                      <span className="diary-ribbon" />
-                      <span className="diary-line diary-line-one" />
-                      <span className="diary-line diary-line-two" />
-                      <span className="diary-heart" />
-                    </div>
-                  </div>
-                </div>
-                <div className="chooser-copy">
-                  <div className="chooser-eyebrow">Diary</div>
-                  <h3>Open Diary Book</h3>
-                  <p>
-                    Move into the diary book with the calendar, list, and edit pages.
-                  </p>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                className="chooser-card"
-                onClick={openTarotIndex}
-              >
-                <div className="chooser-media" aria-hidden="true">
-                  <div className="chooser-media-frame chooser-media-tarot">
-                    <div className="chooser-media-glow" />
-                    <div className="chooser-illustration tarot-illustration">
-                      <span className="tarot-card tarot-card-back" />
-                      <span className="tarot-card tarot-card-front" />
-                      <span className="tarot-moon" />
-                      <span className="tarot-star tarot-star-one" />
-                      <span className="tarot-star tarot-star-two" />
-                    </div>
-                  </div>
-                </div>
-                <div className="chooser-copy">
-                  <div className="chooser-eyebrow">Tarot</div>
-                  <h3>Open Tarot Room</h3>
-                  <p>
-                    Enter the tarot app to draw cards, browse decks.
-                  </p>
-                </div>
-              </button>
-            </div>
-          </div>
+          <BookChooserPage
+            onOpenAkashicIndex={openAkashicIndex}
+            onOpenDiaryBook={openDiaryBook}
+            onOpenTarotIndex={openTarotIndex}
+          />
         ),
       },
       {
