@@ -20,6 +20,7 @@ def react_app(request, path=""):
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/csrf/", diary_views.api_csrf, name="api_csrf"),
+    path("api/version/", diary_views.api_version, name="api_version"),
     path("api/auth/me/", diary_views.api_auth_me, name="api_auth_me"),
     path("api/auth/login/", diary_views.api_auth_login, name="api_auth_login"),
     path("api/auth/logout/", diary_views.api_auth_logout, name="api_auth_logout"),

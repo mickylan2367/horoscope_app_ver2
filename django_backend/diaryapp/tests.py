@@ -1,6 +1,7 @@
 import json
 from unittest.mock import patch
 
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.test import TestCase
 from django.urls import reverse
@@ -97,6 +98,18 @@ class DiarySecondSelfTests(TestCase):
         self.assertNotIn("<script", html)
         self.assertNotIn("<img", html)
         self.assertNotIn("onerror", html)
+
+    def test_api_version_returns_app_version(self):
+        response = self.client.get(reverse("api_version"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json(),
+            {
+                "name": "Daily Witchcrafts",
+                "version": settings.APP_VERSION,
+            },
+        )
 
     def test_diary_create_preserves_raw_content_but_sanitizes_rendered_html(self):
         self.client.force_login(self.user)

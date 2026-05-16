@@ -17,11 +17,10 @@ import os
 from django.conf import settings
 from .draw import draw_horoscope, detect_aspects
 from datetime import datetime, time as dtime
-from .forms import HoroscopeForm, HelioForm, HoroscopeProfile
+from .forms import HoroscopeForm, HoroscopeProfile
 import hashlib
 from django.core.cache import cache
 from django.core.exceptions import PermissionDenied
-from openai import OpenAI
 import json
 from pathlib import Path
 from collections import OrderedDict
@@ -31,17 +30,8 @@ from django.db import transaction
 from django.db.models import Count, Q
 from django.http import JsonResponse, RawPostDataException
 from django.views.decorators.http import require_http_methods
-from django.views.decorators.csrf import csrf_exempt
 from diaryapp.memory import ensure_user_diary_index, search_diary_chunks
-
-_client = None
-
-
-def get_openai_client():
-    global _client
-    if _client is None:
-        _client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-    return _client
+from horoscope.openai_utils import get_openai_client, plain_text_ai_reply
 
 
 # まず必要なモノをロード
@@ -305,31 +295,6 @@ def generate_ai_tarot_interpretation(tarot_payload):
         return cached
 
     prompt = f"""
-あなたは、夜の小さな相談室にいる魔女のタロット読みです。
-相談者の悩みと引かれたカードをもとに、日本語で占いの解釈を書いてください。
-
-大切な姿勢:
-- 相談者のつらさや迷いには寄り添う。ただし、根拠なく「大丈夫」「必ず良くなる」とは言わない。
-- カードが停滞、拒絶、終わり、未練、危険、損失、関係の不均衡を示す場合は、やわらかくぼかしすぎず、はっきり告げる。
-- 良いカード、回復や発展を示すカード、正位置で力が出ているカードがある場合は、その象徴から「どんな良い未来が起こりそうか」を具体的な出来事として描く。例: 連絡が来る、誤解がほどける、協力者が現れる、仕事の評価が上がる、気持ちが前向きに戻る、次の約束が決まるなど。
-- 良い流れは、抽象的な励ましだけで終わらせない。カード名、位置、向き、意味を根拠にして、相談者が想像しやすい未来の場面へ紡ぐ。
-- ただし、未来を断定しすぎない。「〜になりそう」「〜の兆しがあります」「〜へ進みやすい流れです」のように、占いとして自然な余白を残す。
-- 怖がらせる断定や脅しは避ける。占いは決定ではなく、今見えている流れとして伝える。
-- 恋愛・仕事・人間関係の悩みに対して、相手の気持ちを断定しすぎず、相談者が次に取れる現実的な一歩を示す。
-- 医療、法律、金銭の重大判断は専門家への相談を促す。
-
-出力形式:
-1. まず2〜3文で、全体の流れを魔女らしい静かな語り口で伝える。
-2. 良いカードがある場合は、全体の流れの中に「近い未来に起こりそうな良い具体的事象」を1〜2個入れる。
-3. 次に、カードごとの意味を短く読む。
-4. 最後に「今夜の助言」として、相談者が今日か明日にできる具体的な行動を1〜3個示す。
-
-長さは500〜900字程度。
-
-データ:
-{json.dumps(tarot_payload, ensure_ascii=False, indent=2)}
-""".strip()
-    prompt = f"""
 あなたは、夜の小さな相談室にいる「怖くないタロット読み」です。
 相談者の悩みと引かれたカードをもとに、日本語でやさしく深掘りした解釈を書いてください。
 
@@ -390,23 +355,6 @@ def _tarot_consult_references(reading):
             for card in reading.cards.all()
         ],
     }
-
-
-def plain_text_ai_reply(text, max_chars=None):
-    text = re.sub(r"```(?:\w+)?\n?([\s\S]*?)```", r"\1", text or "")
-    text = re.sub(r"^#{1,6}\s+", "", text, flags=re.MULTILINE)
-    text = re.sub(r"^\s*[-*+]\s+", "", text, flags=re.MULTILINE)
-    text = re.sub(r"^\s*\d+[.)]\s+", "", text, flags=re.MULTILINE)
-    text = re.sub(r"[*_`]+", "", text)
-    text = re.sub(r"\n{3,}", "\n\n", text)
-    text = text.strip()
-    if max_chars and len(text) > max_chars:
-        clipped = text[:max_chars]
-        sentence_end = max(clipped.rfind("。"), clipped.rfind("！"), clipped.rfind("？"), clipped.rfind("."), clipped.rfind("!"), clipped.rfind("?"))
-        if sentence_end >= max_chars * 0.45:
-            return clipped[: sentence_end + 1].strip()
-        return clipped.rstrip("、, \n") + "..."
-    return text
 
 
 def generate_ai_tarot_consult_reply(reading, message, history=None, diary_context=None):

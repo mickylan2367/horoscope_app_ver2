@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, BookOpen, Check, Edit3, Image as ImageIcon, Plus, Search, Sparkles, Star, Trash2 } from "lucide-react";
 import Layout from "../components/Layout";
@@ -31,6 +31,20 @@ function ErrorNotice({ message }) {
 
 function LoadingNotice() {
   return <p className="rounded-xl border border-white/10 bg-white/8 px-4 py-3 text-sm text-slate-200">Loading...</p>;
+}
+
+function useObjectPreviewUrl(file) {
+  const previewUrl = useMemo(() => (file ? URL.createObjectURL(file) : ""), [file]);
+
+  useEffect(() => {
+    return () => {
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+      }
+    };
+  }, [previewUrl]);
+
+  return previewUrl;
 }
 
 function TarotLibraryPageFrame({ children, showDeckListButton = false }) {
@@ -536,16 +550,17 @@ export function TarotDeckListPage({ user, onLogout }) {
   const [deckType, setDeckType] = useState("tarot");
   const [allowReversed, setAllowReversed] = useState(true);
   const coverInputRef = useRef(null);
-  const coverPreviewUrl = useMemo(() => (coverImageFile ? URL.createObjectURL(coverImageFile) : ""), [coverImageFile]);
+  const coverPreviewUrl = useObjectPreviewUrl(coverImageFile);
 
-  const loadDecks = () => {
-    setError("");
-    apiFetch("/api/tarot/decks/").then(setData).catch((err) => setError(err.message || "Failed to load decks."));
-  };
+  const loadDecks = useCallback(() => {
+    return apiFetch("/api/tarot/decks/")
+      .then(setData)
+      .catch((err) => setError(err.message || "Failed to load decks."));
+  }, []);
 
   useEffect(() => {
-    apiFetch("/api/tarot/decks/").then(setData).catch((err) => setError(err.message || "Failed to load decks."));
-  }, []);
+    loadDecks();
+  }, [loadDecks]);
 
   const createDeck = async (event) => {
     event.preventDefault();
@@ -575,15 +590,6 @@ export function TarotDeckListPage({ user, onLogout }) {
       setError(err.message || "Failed to create deck.");
     }
   };
-
-  useEffect(() => {
-    const objectUrl = coverPreviewUrl;
-    return () => {
-      if (objectUrl) {
-        URL.revokeObjectURL(objectUrl);
-      }
-    };
-  }, [coverPreviewUrl]);
 
   return (
     <TarotShell user={user} onLogout={onLogout} wide hideHeader hideBackground>
@@ -939,7 +945,7 @@ export function TarotDeckDetailPage({ user, onLogout }) {
   const [arcana, setArcana] = useState("all");
   const [error, setError] = useState("");
   const [coverImageFile, setCoverImageFile] = useState(null);
-  const coverPreviewUrl = useMemo(() => (coverImageFile ? URL.createObjectURL(coverImageFile) : ""), [coverImageFile]);
+  const coverPreviewUrl = useObjectPreviewUrl(coverImageFile);
   const [deckForm, setDeckForm] = useState({
     name: "",
     description: "",
@@ -968,15 +974,6 @@ export function TarotDeckDetailPage({ user, onLogout }) {
       })
       .catch((err) => setError(err.message || "Failed to load deck."));
   }, [deckId]);
-
-  useEffect(() => {
-    const objectUrl = coverPreviewUrl;
-    return () => {
-      if (objectUrl) {
-        URL.revokeObjectURL(objectUrl);
-      }
-    };
-  }, [coverPreviewUrl]);
 
   const filteredCards = useMemo(() => {
     const cards = data?.cards ?? [];
@@ -1182,7 +1179,7 @@ export function TarotCardEditorPage({ user, onLogout }) {
   const imageInputRef = useRef(null);
   const [loadedDeckId, setLoadedDeckId] = useState(deckId ?? "");
   const [imageFile, setImageFile] = useState(null);
-  const imagePreviewUrl = useMemo(() => (imageFile ? URL.createObjectURL(imageFile) : ""), [imageFile]);
+  const imagePreviewUrl = useObjectPreviewUrl(imageFile);
   const [form, setForm] = useState({
     name: "",
     arcana: "oracle",
@@ -1215,15 +1212,6 @@ export function TarotCardEditorPage({ user, onLogout }) {
       })
       .catch((err) => setError(err.message || "Failed to load card."));
   }, [cardId]);
-
-  useEffect(() => {
-    const objectUrl = imagePreviewUrl;
-    return () => {
-      if (objectUrl) {
-        URL.revokeObjectURL(objectUrl);
-      }
-    };
-  }, [imagePreviewUrl]);
 
   const updateField = (field) => (event) => setForm((current) => ({ ...current, [field]: event.target.value }));
   const chooseImage = () => {

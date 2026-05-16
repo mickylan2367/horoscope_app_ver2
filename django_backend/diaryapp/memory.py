@@ -3,24 +3,13 @@ import math
 import os
 import re
 
-from openai import OpenAI
-
 from .models import Diary, DiaryMemoryChunk
+from horoscope.openai_utils import get_openai_client
 
 
 EMBEDDING_MODEL = os.getenv("OPENAI_EMBEDDING_MODEL", "text-embedding-3-small")
 CHUNK_SIZE = 1200
 CHUNK_OVERLAP = 160
-
-_client = None
-
-
-def get_openai_client():
-    global _client
-    if _client is None:
-        _client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-    return _client
-
 
 def normalize_diary_text(text):
     return re.sub(r"\s+", " ", text or "").strip()

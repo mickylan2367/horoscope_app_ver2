@@ -4,7 +4,7 @@ from .models import Diary, DiaryImage, DiaryMemoryChunk, Profile
 from .forms import DiaryForm,DiaryImageFormSet
 import markdown
 import bleach
-from django.contrib.auth.forms import UserCreationForm,PasswordChangeForm
+from django.contrib.auth.forms import PasswordChangeForm
 from .forms import RegisterForm, ProfileForm,UserUpdateForm
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
@@ -12,51 +12,21 @@ from django.shortcuts import redirect
 from django.contrib.auth import update_session_auth_hash
 import json
 from django.http import JsonResponse
+from django.conf import settings
 from django.views.decorators.http import require_http_methods
-from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.contrib.auth.models import User
 from django.db.models import Prefetch
 from django.utils import timezone
 from django.utils.dateparse import parse_date
 from pathlib import Path
-from openai import OpenAI
-import os
-import re
 
 from .memory import (
-    diary_chunk_payload,
     ensure_user_diary_index,
     reindex_user_diaries,
     search_diary_chunks,
 )
-
-_client = None
-
-
-def get_openai_client():
-    global _client
-    if _client is None:
-        _client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-    return _client
-
-
-def plain_text_ai_reply(text, max_chars=None):
-    text = re.sub(r"```(?:\w+)?\n?([\s\S]*?)```", r"\1", text or "")
-    text = re.sub(r"^#{1,6}\s+", "", text, flags=re.MULTILINE)
-    text = re.sub(r"^\s*[-*+]\s+", "", text, flags=re.MULTILINE)
-    text = re.sub(r"^\s*\d+[.)]\s+", "", text, flags=re.MULTILINE)
-    text = re.sub(r"[*_`]+", "", text)
-    text = re.sub(r"\n{3,}", "\n\n", text)
-    text = text.strip()
-    if max_chars and len(text) > max_chars:
-        clipped = text[:max_chars]
-        sentence_end = max(clipped.rfind("。"), clipped.rfind("！"), clipped.rfind("？"), clipped.rfind("."), clipped.rfind("!"), clipped.rfind("?"))
-        if sentence_end >= max_chars * 0.45:
-            return clipped[: sentence_end + 1].strip()
-        return clipped.rstrip("、, \n") + "..."
-    return text
-
+from horoscope.openai_utils import get_openai_client, plain_text_ai_reply
 
 ALLOWED_MARKDOWN_TAGS = {
     "a",
@@ -139,13 +109,6 @@ def diary_create(request):
             formset.instance = diary
             formset.save()
             return redirect('diary_list')
-        else:
-            print("==== diary_create debug ====")
-            print("POST:", request.POST)
-            print("FILES:", request.FILES)
-            print("form errors:", form.errors)
-            print("formset errors:", formset.errors)
-            print("formset non form errors:", formset.non_form_errors())
     else:
         form = DiaryForm()
         formset = DiaryImageFormSet(prefix="images")
@@ -374,6 +337,16 @@ def _diary_payload(diary, include_rendered=True):
 @require_http_methods(["GET"])
 def api_csrf(request):
     return JsonResponse({"ok": True})
+
+
+@require_http_methods(["GET"])
+def api_version(request):
+    return JsonResponse(
+        {
+            "name": "Daily Witchcrafts",
+            "version": settings.APP_VERSION,
+        }
+    )
 
 
 @require_http_methods(["GET"])

@@ -44,6 +44,14 @@ def dedupe(items):
     return list(dict.fromkeys(item for item in items if item))
 
 
+def read_app_version():
+    version_file = BASE_DIR.parent / "VERSION"
+    try:
+        return version_file.read_text(encoding="utf-8").strip() or "0.0.0"
+    except OSError:
+        return "0.0.0"
+
+
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
 
@@ -55,6 +63,7 @@ SECRET_KEY = os.getenv(
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = env_bool("DEBUG", default=True)
+APP_VERSION = os.getenv("APP_VERSION", read_app_version())
 
 default_allowed_hosts = [
     "127.0.0.1",

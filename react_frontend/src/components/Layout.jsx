@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { BookOpen, LogIn, LogOut, Menu, Sparkles, User, UserPlus, X } from "lucide-react";
 import { apiFetch } from "../api";
+import AppHeader from "./AppHeader";
 import CosmicBackground from "./CosmicBackground";
 
 const AMBIENT_GLYPHS = ["✦", "✧", "ᚠ", "ᛟ", "ᛉ", "⟡", "⋆", "☾"];
@@ -94,12 +95,6 @@ export default function Layout({
   }, [spellEffects]);
 
   const isCosmicHeader = headerVariant === "cosmic";
-  const headerClassName = isCosmicHeader
-    ? "sticky top-0 z-50 border-b border-white/10 bg-gradient-to-r from-[#1a1026]/18 via-[#2a1530]/14 to-[#1a1026]/18 shadow-sm backdrop-blur-2xl"
-    : "sticky top-0 z-50 border-b border-[#cfabc0] bg-gradient-to-r from-[#c98ca8] via-[#ddb0c0] to-[#dca5b6] shadow-sm";
-  const titleClassName = isCosmicHeader
-    ? `font-bold tracking-wide text-[#efe8ff] transition hover:text-white ${compactHeader ? "text-lg md:text-xl" : "text-xl"}`
-    : `font-bold tracking-wide text-[#4b3850] transition hover:text-[#7b5b70] ${compactHeader ? "text-lg md:text-xl" : "text-xl"}`;
   const primaryButtonClassName = isCosmicHeader
     ? `inline-flex items-center gap-2 rounded-full border border-white/18 bg-white/8 text-base text-[#f4eeff] transition hover:bg-white/14 ${
         compactHeader ? "px-4 py-2" : "px-5 py-2.5"
@@ -121,119 +116,11 @@ export default function Layout({
   return (
     <div className="relative min-h-screen bg-[#070b17] text-[#eae5f6]">
       {!hideBackground ? <CosmicBackground variant={backgroundVariant} /> : null}
-      {!hideHeader ? <header className={headerClassName}>
-        <div
-          className={`mx-auto flex max-w-6xl items-center justify-between px-6 ${
-            compactHeader ? "py-3 md:px-8 md:py-3" : "py-4 md:px-10"
-          }`}
-        >
-          <Link
-            to="/"
-            className={titleClassName}
-          >
-            Daily Witchcrafts
-          </Link>
-
-          {!hideAuthActions && (
-            <div className="hidden items-center gap-4 md:flex">
-              {user ? (
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => setProfileOpen((prev) => !prev)}
-                  className={primaryButtonClassName}
-                >
-                  {user.iconUrl ? (
-                    <img
-                      src={user.iconUrl}
-                      alt={user.username ?? "user icon"}
-                      className={compactHeader ? "h-9 w-9 rounded-full object-cover" : "h-10 w-10 rounded-full object-cover"}
-                    />
-                  ) : (
-                    <div className={`flex items-center justify-center rounded-full bg-[#e7b2c5] text-[#4b3850] ${
-                      compactHeader ? "h-9 w-9" : "h-10 w-10"
-                    }`}>
-                      <User className="h-5 w-5" />
-                    </div>
-                  )}
-                  <span className="max-w-[140px] truncate text-sm text-[#4b3850]">
-                    {user.username}
-                  </span>
-                </button>
-
-                {profileOpen && (
-                  <div className="absolute right-0 mt-3 w-56 overflow-hidden rounded-2xl border border-[#d7a4bb] bg-[#fff8fb] shadow-2xl">
-                    <Link
-                      to="/profile"
-                      className="flex items-center gap-3 px-4 py-3 text-sm text-[#4b3850] transition hover:bg-[#f8edf2]"
-                      onClick={() => setProfileOpen(false)}
-                    >
-                      <User className="h-4 w-4" />
-                      PROFILE
-                    </Link>
-                    <Link
-                      to="/diary/list"
-                      className="flex items-center gap-3 px-4 py-3 text-sm text-[#4b3850] transition hover:bg-[#f8edf2]"
-                      onClick={() => setProfileOpen(false)}
-                    >
-                      <BookOpen className="h-4 w-4" />
-                      RECORDS
-                    </Link>
-                    <Link
-                      to="/tarot"
-                      className="flex items-center gap-3 px-4 py-3 text-sm text-[#4b3850] transition hover:bg-[#f8edf2]"
-                      onClick={() => setProfileOpen(false)}
-                    >
-                      <Sparkles className="h-4 w-4" />
-                      TAROT
-                    </Link>
-                    <button
-                      type="button"
-                      className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-[#9d5f7e] transition hover:bg-[#f8edf2]"
-                      onClick={handleLogout}
-                    >
-                      <LogOut className="h-4 w-4" />
-                      LOGOUT
-                    </button>
-                  </div>
-                )}
-              </div>
-            ) : hideAuthActions ? null : (
-              <>
-              <Link
-                to="/login"
-                className={primaryButtonClassName}
-              >
-                <LogIn className="h-4 w-4" />
-                LOGIN
-              </Link>
-              <Link
-                to="/register"
-                className={accentButtonClassName}
-              >
-                <UserPlus className="h-4 w-4" />
-                NEW
-                </Link>
-              </>
-            )}
-            </div>
-          )}
-
-          {!hideAuthActions && (
-            <button
-              type="button"
-              className={compactHeader
-                ? "inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#d7a4bb] bg-white/72 md:hidden"
-                : "inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#d7a4bb] bg-white/72 md:hidden"}
-              onClick={() => setMenuOpen((prev) => !prev)}
-              aria-label="Open menu"
-            >
-              {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-            </button>
-          )}
-        </div>
-
-        {!hideAuthActions && menuOpen && (
+      {!hideHeader ? (
+        <AppHeader
+          variant={headerVariant}
+          compact={compactHeader}
+          menu={!hideAuthActions && menuOpen ? (
           <div className={menuClassName}>
             <div className="flex flex-col gap-3">
               {user ? (
@@ -287,11 +174,104 @@ export default function Layout({
               )}
             </div>
           </div>
-        )}
-      </header> : null}
+          ) : null}
+        >
+          {!hideAuthActions && (
+            <div className="hidden items-center gap-4 md:flex">
+              {user ? (
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setProfileOpen((prev) => !prev)}
+                    className={primaryButtonClassName}
+                  >
+                    {user.iconUrl ? (
+                      <img
+                        src={user.iconUrl}
+                        alt={user.username ?? "user icon"}
+                        className={compactHeader ? "h-9 w-9 rounded-full object-cover" : "h-10 w-10 rounded-full object-cover"}
+                      />
+                    ) : (
+                      <div className={`flex items-center justify-center rounded-full bg-[#e7b2c5] text-[#4b3850] ${
+                        compactHeader ? "h-9 w-9" : "h-10 w-10"
+                      }`}>
+                        <User className="h-5 w-5" />
+                      </div>
+                    )}
+                    <span className="max-w-[140px] truncate text-sm text-[#4b3850]">
+                      {user.username}
+                    </span>
+                  </button>
+
+                  {profileOpen && (
+                    <div className="absolute right-0 mt-3 w-56 overflow-hidden rounded-2xl border border-[#d7a4bb] bg-[#fff8fb] shadow-2xl">
+                      <Link
+                        to="/profile"
+                        className="flex items-center gap-3 px-4 py-3 text-sm text-[#4b3850] transition hover:bg-[#f8edf2]"
+                        onClick={() => setProfileOpen(false)}
+                      >
+                        <User className="h-4 w-4" />
+                        PROFILE
+                      </Link>
+                      <Link
+                        to="/diary/list"
+                        className="flex items-center gap-3 px-4 py-3 text-sm text-[#4b3850] transition hover:bg-[#f8edf2]"
+                        onClick={() => setProfileOpen(false)}
+                      >
+                        <BookOpen className="h-4 w-4" />
+                        RECORDS
+                      </Link>
+                      <Link
+                        to="/tarot"
+                        className="flex items-center gap-3 px-4 py-3 text-sm text-[#4b3850] transition hover:bg-[#f8edf2]"
+                        onClick={() => setProfileOpen(false)}
+                      >
+                        <Sparkles className="h-4 w-4" />
+                        TAROT
+                      </Link>
+                      <button
+                        type="button"
+                        className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-[#9d5f7e] transition hover:bg-[#f8edf2]"
+                        onClick={handleLogout}
+                      >
+                        <LogOut className="h-4 w-4" />
+                        LOGOUT
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <>
+                  <Link to="/login" className={primaryButtonClassName}>
+                    <LogIn className="h-4 w-4" />
+                    LOGIN
+                  </Link>
+                  <Link to="/register" className={accentButtonClassName}>
+                    <UserPlus className="h-4 w-4" />
+                    NEW
+                  </Link>
+                </>
+              )}
+            </div>
+          )}
+
+          {!hideAuthActions && (
+            <button
+              type="button"
+              className={compactHeader
+                ? "inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#d7a4bb] bg-white/72 md:hidden"
+                : "inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#d7a4bb] bg-white/72 md:hidden"}
+              onClick={() => setMenuOpen((prev) => !prev)}
+              aria-label="Open menu"
+            >
+              {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </button>
+          )}
+        </AppHeader>
+      ) : null}
 
       <main
-        className={`relative z-10 mx-auto px-6 py-8 md:px-10 ${
+        className={`relative z-10 mx-auto px-6 pb-8 md:px-10 ${!hideHeader && isCosmicHeader ? "pt-20" : "pt-8"} ${
           wide ? "max-w-[1600px] lg:px-8 2xl:px-10" : "max-w-6xl"
         }`}
       >
