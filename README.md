@@ -1,187 +1,112 @@
-# LovelyWitch Life
+# Daily Witchcrafts
 
 [![CI](https://github.com/mickylan2367/horoscope_app_ver2/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/mickylan2367/horoscope_app_ver2/actions/workflows/ci.yml)
 
-LovelyWitch Life は、占星術、日記、タロット、プロフィール管理をひとつにまとめた個人向けWebアプリです。Django を API とサーバーサイド基盤に使い、Vite/React で画面を構築しています。
+Daily Witchcrafts は、占星術・タロット・日記をひとつの世界として扱う、個人のための小さな魔法の作業部屋です。
+
+It is a private magical workspace for astrology, tarot, and diary reflection.
+
+空を読み、カードを引き、その日に起きたことを書き残す。  
+その積み重ねが、自分だけの感情・象徴・選択のアーカイブになっていくように設計しています。
 
 ![Home screenshot](image/home.png)
 
-## 主な機能
+## Concept
 
-- ホロスコープ計算、出生情報プロフィール保存、AIリーディング生成
-- 日記の作成、編集、一覧表示、カレンダー表示、Markdownプレビュー
-- 日記画像のアップロード、並び替え、キャプション管理
-- タロット/オラクルデッキ、カード、リーディング履歴の管理
-- タロット結果と日記体験をつなぐ本型UI、ワープ演出、モバイル表示調整
-- ログイン、ユーザー登録、プロフィール、アイコン、パスワード変更
-- Codex を使った Slack 上の役割別エージェント運用
+日々の中には、小さなサインがあります。
 
-## 技術スタック
+何度も出てくるカード、妙に忘れられない夢、少しだけ重たい日、星の配置が自分の内側をそのまま言い当てているように感じる瞬間。
 
-- Backend: Django 5.0.3, SQLite, Pillow, Markdown, OpenAI API
-- Astrology: Skyfield, NumPy, Matplotlib
-- Frontend: React 19, Vite 8, React Router 7, Tailwind CSS 4
-- UI/Animation: Framer Motion, fullPage.js, lucide-react
-- Agent: Python 製 Slack Socket Mode ランナー
+Daily Witchcrafts は、そうした瞬間を一度きりの占いで終わらせず、あとから何度でも戻ってこられる個人の記録に変えるアプリです。
 
-## ディレクトリ構成
+It is not a fortune-telling site that simply gives an answer and disappears. It is a quiet place for returning to your own patterns, memories, and intuition.
 
-- `django_backend/`
-  - Django プロジェクト本体です。
-  - `horoscope/` に設定とルートURLがあります。
-  - `chart/` に占星術、ホロスコープ、タロット関連のモデル/API/計算処理があります。
-  - `diaryapp/` に日記、画像、プロフィール、認証補助APIがあります。
-  - `static/react/` は `react_frontend` の本番ビルド出力先です。
-  - `media/` はアップロード画像の保存先です。
-- `react_frontend/`
-  - Vite/React のフロントエンドです。
-  - `src/pages/` に各ページ、`src/components/` に共通UIがあります。
-  - `vite.config.js` で `/api/` と `/media/` を Django にプロキシしています。
-- `slack-ai-agent/`
-  - Slack から Codex 役割エージェントを起動するランナーです。
-  - `agents/` に planner/frontend/backend/reviewer/integrator などのロール設定があります。
-- `ai_prompts/`
-  - これまでの追加機能や改修用のAI作業プロンプトを保管しています。
-- `image/`
-  - README や説明用のスクリーンショット、共有画像置き場です。
+## What You Can Do
 
-## 必要な環境変数
+### 星を読む / Read The Sky
 
-Django/React アプリだけを動かす場合:
+出生情報を保存し、ホロスコープを作成して、チャートに紐づいたAIリーディングを受け取ることができます。
 
-```powershell
-$env:OPENAI_API_KEY="sk-..."
-```
+入力フォームを埋めるだけの体験ではなく、神秘的な本を開いていくような流れを目指しました。
 
-Slack agent を使う場合:
+### カードを引く / Draw Tarot Cards
 
-```dotenv
-SLACK_BOT_TOKEN=xoxb-...
-SLACK_APP_TOKEN=xapp-...
-```
+タロットやオラクルのデッキを作成し、カードを管理し、リーディング結果を保存できます。
 
-Slack agent のトークンは `slack-ai-agent/agents/<role>/.env` に置くか、プロセス環境変数として設定します。ロール別 `.env` がある場合は、そちらが優先されます。
+カードは一度きりのメッセージではなく、あとで日記と見比べたり、過去の自分の流れを読み返したりするための記録になります。
 
-## セットアップ
+### 日記を残す / Keep A Diary
 
-Backend:
+日記を書き、画像を添え、Markdownで整え、カレンダーやリストから振り返ることができます。
 
-```powershell
-cd django_backend
-python -m venv ..\venv
-..\venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-python manage.py migrate
-```
+日記はただのメモではなく、現実の日々と、星やカードの象徴が交差する場所です。
 
-Frontend:
+### 過去の自分と話す / Talk To Your Past Self
 
-```powershell
-cd react_frontend
-npm install
-```
+過去の日記をもとに、もう一人の自分と話しているような感覚を目指した実験的な記憶機能があります。
 
-## ローカル開発
+忘れていた小さな出来事や感情を、過去の記録からもう一度見つけるための機能です。
 
-Django API サーバー:
+## Experience Design
 
-```powershell
-cd django_backend
-python manage.py runserver 127.0.0.1:8080
-```
+Daily Witchcrafts は、単なる管理画面ではなく「自分だけの魔法道具」のように感じられることを大切にしています。
 
-Vite 開発サーバー:
+Cosmic backgrounds, book-like transitions, tarot-inspired layouts, and soft motion are used to make the experience feel atmospheric and personal.
 
-```powershell
-cd react_frontend
-npm run dev
-```
+同時に、毎日使うための実用性も意識しています。
 
-開発中のReact画面は `http://127.0.0.1:5173/` で確認します。Vite は Django の API とメディアを `http://127.0.0.1:8080/` にプロキシします。
+- 出生プロフィールを保存して、同じ情報を何度も入力しなくていい
+- タロット結果と日記を同じ流れの中で振り返れる
+- カレンダーや一覧から過去の記録に戻れる
+- 最初からアカウント作成を強制せず、あとから始められる
 
-Django からビルド済みReactを配信する場合:
+## Why I Built It
 
-```powershell
-cd react_frontend
-npm run build
-```
+私は、アニメや読書、そして西洋占星術が好きです。
 
-ビルド成果物は `django_backend/static/react/` に出力され、Django 側では `/app/` 以下でReactアプリを配信します。
+同時に、AIや応用数学にも興味があります。  
+占星術、タロット、科学、AIはまったく違うものに見えますが、どれもどこかで同じ問いを持っているように感じます。
 
-## よく使うコマンド
+How do we understand what might happen next?
 
-Backend:
+Daily Witchcrafts は、その興味をひとつのプロダクトとしてつなげたものです。  
+象徴を読むこと、自分の記憶を残すこと、AIと対話することを、ひとつの世界の中にまとめています。
 
-```powershell
-cd django_backend
-python manage.py test
-python manage.py makemigrations
-python manage.py migrate
-python manage.py runserver 127.0.0.1:8080
-```
+## Product Highlights
 
-Frontend:
+- 占星術・タロット・日記をひとつにつなげた体験
+- 物語性のあるビジュアルとホーム画面
+- 本をめくるようなチャート・タロット導線
+- 自分だけのタロット/オラクルデッキ管理
+- 画像つき日記、Markdownプレビュー、カレンダー、リスト表示
+- あとから読み返せる保存済みリーディング
+- チャート、タロット、日記記憶に紐づくAIリーディング
+- 画面全体の雰囲気を揃える共通ヘッダーと認証UI
+- プロダクトバージョン表示
 
-```powershell
-cd react_frontend
-npm run lint
-npm run build
-npm run preview
-```
+## Current Version
 
-Slack agent:
+`v0.1.0`
 
-```powershell
-python .\slack-ai-agent\app.py
-python .\slack-ai-agent\app.py --role planner
-python .\slack-ai-agent\app.py --all
-python .\slack-ai-agent\app.py --list-roles
-```
+This version focuses on building the core world of Daily Witchcrafts:
 
-## 主要URL
+- astrology profile and chart reading flow
+- tarot deck, card, and reading flow
+- diary archive
+- profile and account features
+- AI-assisted reflection
+- responsive visual polish
 
-- `/` Django の既存ホロスコープ画面
-- `/app/` React アプリ
-- `/app/chart` React版チャート画面
-- `/app/diary` 日記カレンダー
-- `/app/diary/list` 日記一覧
-- `/app/tarot` タロット入口
-- `/app/tarot/decks` デッキ管理
-- `/app/tarot/read` タロットリーディング
-- `/app/profile` プロフィール
-- `/admin/` Django admin
+## Screenshots
 
-## API 概要
+![Home screenshot](image/home.png)
 
-- `/api/auth/` ログイン、ログアウト、登録、現在ユーザー取得
-- `/api/profile/` プロフィールとパスワード変更
-- `/api/diaries/` 日記CRUD
-- `/api/diaries/<id>/images/` 日記画像追加
-- `/api/diary-images/<id>/` 日記画像更新/削除
-- `/api/chart/` 出生プロフィールとチャート計算
-- `/api/tarot/` デッキ、カード、リーディング
+今後、チャート画面・タロット画面・日記画面などのスクリーンショットも追加して、ポートフォリオとして見やすくしていく予定です。
 
-## テストと確認
+## About The Project
 
-Backend 変更後:
+Daily Witchcrafts はポートフォリオ作品ですが、単なる機能デモではなく、実際のプロダクトとして成立することを目指して作っています。
 
-```powershell
-cd django_backend
-python manage.py test
-```
+大切にしているのは、機能が並んでいることではなく、占星術・タロット・日記・AIリフレクションが、ひとつのまとまりのある場所として感じられることです。
 
-Frontend 変更後:
-
-```powershell
-cd react_frontend
-npm run lint
-```
-
-画面変更では、Vite 開発サーバー上で該当ルートを手動確認します。
-
-## 注意事項
-
-- APIキー、Slackトークン、ローカル認証情報はコミットしないでください。
-- `venv/`, `node_modules/`, ローカルDB、アップロード画像、ランタイムログは原則として管理対象に含めません。
-- `django_backend/static/react/` はReactのビルド成果物です。フロントエンドを変更したら `npm run build` で更新します。
-- `ai_prompts/` は実装計画や作業指示の保管場所であり、アプリ実行に必須ではありません。
+This project is still evolving. Future improvements may include richer saved-reading views, more polished diary memory interactions, better onboarding, and updated screenshots for the latest UI.
